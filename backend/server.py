@@ -100,6 +100,7 @@ class BarcodeScanCreate(BaseModel):
     barcode_data: str
     visitor_name: Optional[str] = None
     video_timestamp: Optional[float] = None
+    frame_code: Optional[int] = None
 
 class TranscriptRequest(BaseModel):
     recording_id: str
