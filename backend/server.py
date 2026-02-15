@@ -194,6 +194,68 @@ async def summarize_text(text: str) -> Dict[str, Any]:
         logger.error(f"Summarization error: {e}")
         return {"summary": "", "highlights": []}
 
+async def detect_conversations(text: str, total_duration: float = 0) -> List[Dict[str, Any]]:
+    """Detect and segment individual conversations from transcript using GPT"""
+    if not text:
+        return []
+    
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": f"""You are an AI analyzing expo booth recordings. The total recording duration is approximately {total_duration} seconds.
+                
+Your task is to identify SEPARATE conversations/interactions between booth staff and visitors.
+
+For each conversation segment, provide:
+1. A brief title/topic of the conversation
+2. Who the speakers appear to be (e.g., "Staff", "Visitor 1", "Visitor 2")
+3. Estimated start time as a percentage of the recording (0-100)
+4. A 1-2 sentence summary of what was discussed
+5. Key points or interests expressed
+6. Sentiment (positive, neutral, interested, skeptical)
+
+Return as JSON:
+{{
+    "conversations": [
+        {{
+            "id": 1,
+            "title": "Product Demo Discussion",
+            "speakers": ["Staff", "Visitor"],
+            "start_percent": 0,
+            "end_percent": 25,
+            "summary": "...",
+            "key_points": ["point1", "point2"],
+            "sentiment": "interested",
+            "excerpt": "brief quote from conversation"
+        }}
+    ],
+    "total_interactions": 3,
+    "main_topics": ["topic1", "topic2"]
+}}
+
+If you cannot clearly distinguish separate conversations, create logical segments based on topic changes."""},
+                {"role": "user", "content": f"Transcript:\n{text}"}
+            ],
+            response_format={"type": "json_object"}
+        )
+        result = json.loads(response.choices[0].message.content)
+        
+        # Convert percentages to actual timestamps
+        conversations = result.get('conversations', [])
+        for conv in conversations:
+            conv['start_time'] = (conv.get('start_percent', 0) / 100) * total_duration
+            conv['end_time'] = (conv.get('end_percent', 100) / 100) * total_duration
+        
+        return {
+            "conversations": conversations,
+            "total_interactions": result.get('total_interactions', len(conversations)),
+            "main_topics": result.get('main_topics', [])
+        }
+    except Exception as e:
+        logger.error(f"Conversation detection error: {e}")
+        return {"conversations": [], "total_interactions": 0, "main_topics": []}
+
 # ==================== AUTH ENDPOINTS ====================
 
 @api_router.post("/auth/register")
