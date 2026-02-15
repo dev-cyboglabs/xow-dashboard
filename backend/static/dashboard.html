@@ -314,13 +314,31 @@
                     <div class="flex flex-wrap gap-2 mt-3">
                         ${r.highlights.slice(0, 5).map(h => `<span class="text-xs px-2 py-1 bg-[#111] rounded-full text-gray-400">${h}</span>`).join('')}
                     </div>` : ''}
-                </div>` : r.status === 'uploaded' ? `
+                </div>` : r.status === 'processing' || r.status === 'uploaded' ? `
                 <div class="p-4 bg-[#111] border-b border-[#1a1a1a]">
                     <div class="flex items-center gap-3 text-amber-400">
                         <div class="loading">
                             <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         </div>
                         <span class="text-sm">Processing audio... AI analysis in progress</span>
+                    </div>
+                </div>` : (!r.transcript && r.status !== 'error') ? `
+                <div class="p-4 bg-[#111] border-b border-[#1a1a1a]">
+                    <div class="flex items-center justify-between">
+                        <div class="text-sm text-gray-400">
+                            <span class="text-amber-400">Note:</span> Audio transcription requires OpenAI API key. You can add a manual transcript for AI analysis.
+                        </div>
+                        <button onclick="showTranscriptInput('${r.id}')" class="flex items-center gap-2 px-3 py-1.5 bg-purple/20 hover:bg-purple rounded text-sm text-purple hover:text-white transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
+                            Add Transcript
+                        </button>
+                    </div>
+                    <div id="transcript-input-${r.id}" class="hidden mt-4">
+                        <textarea id="transcript-text-${r.id}" class="w-full h-32 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-3 text-sm text-white resize-none" placeholder="Paste or type the transcript here..."></textarea>
+                        <div class="flex justify-end gap-2 mt-2">
+                            <button onclick="hideTranscriptInput('${r.id}')" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white">Cancel</button>
+                            <button onclick="submitManualTranscript('${r.id}')" class="px-4 py-1.5 bg-purple hover:bg-[#7C3AED] rounded text-sm text-white">Analyze with AI</button>
+                        </div>
                     </div>
                 </div>` : ''}
                 
