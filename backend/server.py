@@ -865,12 +865,16 @@ async def get_video(recording_id: str):
         raise HTTPException(status_code=400, detail=str(e))
 
 @api_router.get("/recordings/{recording_id}/audio")
-async def get_audio(recording_id: str):
-    """Stream audio file"""
+async def get_audio(recording_id: str, request: Request):
+    """Stream audio file with range support"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording or not recording.get('audio_file_id'):
             raise HTTPException(status_code=404, detail="Audio not found")
+        
+        # Get file info for size
+        file_info = await db.fs.files.find_one({"_id": ObjectId(recording['audio_file_id'])})
+        file_size = file_info.get('length', 0) if file_info else 0
         
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
         
@@ -889,23 +893,23 @@ async def get_audio(recording_id: str):
         elif header[:4] == b'\x1aE\xdf\xa3':
             content_type = "audio/webm"
         elif b'ftyp' in header[:12]:
-            # MP4/M4A format
-            content_type = "audio/mp4"
+            # MP4/M4A format - use audio/aac for better browser compatibility
+            content_type = "audio/aac"
         
-        # Close and reopen to start from beginning
+        # Reopen stream to start from beginning
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
         
-        async def stream_audio():
-            while True:
-                chunk = await grid_out.read(1024 * 1024)  # 1MB chunks
-                if not chunk:
-                    break
-                yield chunk
+        # Read full content for non-streaming response (better browser compatibility)
+        content = await grid_out.read()
         
-        return StreamingResponse(
-            stream_audio(),
+        return Response(
+            content=content,
             media_type=content_type,
-            headers={"Content-Disposition": f"inline; filename=audio_{recording_id}.m4a"}
+            headers={
+                "Content-Disposition": f"inline; filename=audio_{recording_id}.m4a",
+                "Content-Length": str(len(content)),
+                "Accept-Ranges": "bytes"
+            }
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
