@@ -662,6 +662,49 @@
             setTimeout(checkStatus, 3000);
         }
 
+        function showTranscriptInput(id) {
+            document.getElementById(`transcript-input-${id}`).classList.remove('hidden');
+        }
+
+        function hideTranscriptInput(id) {
+            document.getElementById(`transcript-input-${id}`).classList.add('hidden');
+        }
+
+        async function submitManualTranscript(id) {
+            const textarea = document.getElementById(`transcript-text-${id}`);
+            const transcript = textarea.value.trim();
+            
+            if (!transcript) {
+                alert('Please enter a transcript');
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API}/recordings/${id}/manual-transcript`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ transcript })
+                });
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update local data
+                    const recording = data.recordings.find(r => r.id === id);
+                    if (recording) {
+                        recording.status = 'processing';
+                        recording.transcript = transcript;
+                    }
+                    render();
+                    pollRecordingStatus(id);
+                } else {
+                    alert('Failed: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to submit transcript');
+            }
+        }
+
         function sentimentClass(s) {
             return {
                 positive: 'bg-green-500/20 text-green-400',
