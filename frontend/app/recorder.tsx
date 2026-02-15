@@ -8,12 +8,14 @@ import {
   Platform,
   useWindowDimensions,
   Animated,
+  Alert,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Audio } from 'expo-av';
+import * as FileSystem from 'expo-file-system';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -38,6 +40,7 @@ export default function RecorderScreen() {
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [currentTime, setCurrentTime] = useState(new Date());
   const [isUploading, setIsUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const toastAnim = useRef(new Animated.Value(0)).current;
@@ -49,6 +52,7 @@ export default function RecorderScreen() {
   const clockRef = useRef<NodeJS.Timeout | null>(null);
   const recordingStartTime = useRef<number>(0);
   const barcodeInputRef = useRef<TextInput>(null);
+  const videoUriRef = useRef<string | null>(null);
 
   useEffect(() => {
     loadDevice();
@@ -64,12 +68,12 @@ export default function RecorderScreen() {
     };
   }, []);
 
-  const showToast = (msg: string) => {
+  const showToast = (msg: string, isError: boolean = false) => {
     setToastMessage(msg);
     setToastVisible(true);
     Animated.sequence([
       Animated.timing(toastAnim, { toValue: 1, duration: 200, useNativeDriver: true }),
-      Animated.delay(1500),
+      Animated.delay(2000),
       Animated.timing(toastAnim, { toValue: 0, duration: 200, useNativeDriver: true }),
     ]).start(() => setToastVisible(false));
   };
@@ -82,15 +86,23 @@ export default function RecorderScreen() {
 
   const checkPermissions = async () => {
     if (!cameraPermission?.granted) await requestCameraPermission();
-    await Audio.requestPermissionsAsync();
-    await Audio.setAudioModeAsync({ allowsRecordingIOS: true, playsInSilentModeIOS: true });
+    const audioStatus = await Audio.requestPermissionsAsync();
+    if (audioStatus.granted) {
+      await Audio.setAudioModeAsync({
+        allowsRecordingIOS: true,
+        playsInSilentModeIOS: true,
+        staysActiveInBackground: true,
+      });
+    }
   };
 
   const checkConnection = async () => {
     try {
       await axios.get(`${API_URL}/api/health`, { timeout: 5000 });
       setIsOnline(true);
-    } catch { setIsOnline(false); }
+    } catch {
+      setIsOnline(false);
+    }
   };
 
   const formatTC = (s: number) => {
@@ -98,7 +110,7 @@ export default function RecorderScreen() {
     const m = Math.floor((s % 3600) / 60);
     const sec = s % 60;
     const f = frameCount % 30;
-    return `${h.toString().padStart(2,'0')}:${m.toString().padStart(2,'0')}:${sec.toString().padStart(2,'0')}:${f.toString().padStart(2,'0')}`;
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}:${f.toString().padStart(2, '0')}`;
   };
 
   const formatDate = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
@@ -106,9 +118,13 @@ export default function RecorderScreen() {
 
   const startRecording = async () => {
     if (!device) return;
+    
     try {
+      // Create recording entry in backend first
       const res = await axios.post(`${API_URL}/api/recordings`, {
-        device_id: device.device_id, expo_name: 'Expo 2025', booth_name: device.name,
+        device_id: device.device_id,
+        expo_name: 'Expo 2025',
+        booth_name: device.name,
       });
       setCurrentRecording(res.data);
       setIsRecording(true);
@@ -116,84 +132,224 @@ export default function RecorderScreen() {
       setBarcodeCount(0);
       setRecordingTime(0);
       recordingStartTime.current = Date.now();
+      
+      // Start timers for UI
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
       frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
-      const rec = new Audio.Recording();
-      await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-      await rec.startAsync();
-      audioRecording.current = rec;
+
+      // Start video recording
+      if (cameraRef.current) {
+        try {
+          const videoResult = await cameraRef.current.recordAsync({
+            maxDuration: 3600, // 1 hour max
+          });
+          // This promise resolves when recording stops
+          if (videoResult?.uri) {
+            videoUriRef.current = videoResult.uri;
+          }
+        } catch (videoErr) {
+          console.log('Video recording not supported on this platform:', videoErr);
+        }
+      }
+
+      // Start audio recording (as backup and for better quality transcription)
+      try {
+        const rec = new Audio.Recording();
+        await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
+        await rec.startAsync();
+        audioRecording.current = rec;
+      } catch (audioErr) {
+        console.log('Audio recording error:', audioErr);
+      }
+
       showToast('Recording started');
     } catch (e) {
-      showToast('Failed to start recording');
+      console.error('Start recording error:', e);
+      showToast('Failed to start recording', true);
     }
   };
 
   const stopRecording = async () => {
     if (!currentRecording) return;
+    
     setIsUploading(true);
+    setUploadProgress(0);
+    
     try {
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
       if (frameTimerRef.current) clearInterval(frameTimerRef.current);
-      let uri = null;
+
+      let audioUri: string | null = null;
+      let videoUri: string | null = null;
+
+      // Stop video recording
+      if (cameraRef.current) {
+        try {
+          cameraRef.current.stopRecording();
+          // Wait a bit for the video to be saved
+          await new Promise(resolve => setTimeout(resolve, 500));
+          videoUri = videoUriRef.current;
+        } catch (e) {
+          console.log('Stop video error:', e);
+        }
+      }
+
+      // Stop audio recording
       if (audioRecording.current) {
-        await audioRecording.current.stopAndUnloadAsync();
-        uri = audioRecording.current.getURI();
-        audioRecording.current = null;
+        try {
+          await audioRecording.current.stopAndUnloadAsync();
+          audioUri = audioRecording.current.getURI();
+          audioRecording.current = null;
+        } catch (e) {
+          console.log('Stop audio error:', e);
+        }
       }
-      if (uri) {
-        const fd = new FormData();
-        fd.append('audio', { uri, type: 'audio/m4a', name: 'rec.m4a' } as any);
-        try { await axios.post(`${API_URL}/api/recordings/${currentRecording.id}/upload-audio`, fd, { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 60000 }); } catch {}
+
+      // Upload video if available
+      if (videoUri) {
+        setUploadProgress(10);
+        showToast('Uploading video...');
+        try {
+          await uploadVideo(currentRecording.id, videoUri);
+          setUploadProgress(50);
+        } catch (e) {
+          console.log('Video upload failed:', e);
+        }
       }
+
+      // Upload audio (this triggers automatic transcription)
+      if (audioUri) {
+        setUploadProgress(60);
+        showToast('Uploading audio...');
+        try {
+          await uploadAudio(currentRecording.id, audioUri);
+          setUploadProgress(90);
+        } catch (e) {
+          console.log('Audio upload failed:', e);
+        }
+      }
+
+      // Mark recording as complete
       await axios.put(`${API_URL}/api/recordings/${currentRecording.id}/complete`);
-      try { axios.post(`${API_URL}/api/recordings/${currentRecording.id}/transcribe`); } catch {}
-      showToast(`Saved! ${barcodeCount} visitors logged`);
+      setUploadProgress(100);
+      
+      showToast(`Saved! ${barcodeCount} visitors • AI processing started`);
+      
+      // Clean up local files
+      if (videoUri) {
+        try { await FileSystem.deleteAsync(videoUri, { idempotent: true }); } catch {}
+      }
+      if (audioUri) {
+        try { await FileSystem.deleteAsync(audioUri, { idempotent: true }); } catch {}
+      }
+
       setCurrentRecording(null);
       setRecordingTime(0);
       setFrameCount(0);
       setBarcodeCount(0);
-    } catch { showToast('Save failed'); }
-    finally { setIsUploading(false); }
+      videoUriRef.current = null;
+    } catch (e) {
+      console.error('Stop recording error:', e);
+      showToast('Save failed', true);
+    } finally {
+      setIsUploading(false);
+      setUploadProgress(0);
+    }
+  };
+
+  const uploadVideo = async (recordingId: string, uri: string) => {
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) return;
+
+    const formData = new FormData();
+    formData.append('video', {
+      uri,
+      type: 'video/mp4',
+      name: 'recording.mp4',
+    } as any);
+
+    await axios.post(
+      `${API_URL}/api/recordings/${recordingId}/upload-video`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 300000, // 5 min timeout for large videos
+      }
+    );
+  };
+
+  const uploadAudio = async (recordingId: string, uri: string) => {
+    const formData = new FormData();
+    formData.append('audio', {
+      uri,
+      type: 'audio/m4a',
+      name: 'recording.m4a',
+    } as any);
+
+    await axios.post(
+      `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+      formData,
+      {
+        headers: { 'Content-Type': 'multipart/form-data' },
+        timeout: 120000, // 2 min timeout
+      }
+    );
   };
 
   const handleBarcode = async () => {
     if (!barcodeInput.trim() || !currentRecording || !isRecording) return;
     const bc = barcodeInput.trim();
     const ts = (Date.now() - recordingStartTime.current) / 1000;
-    try { await axios.post(`${API_URL}/api/barcodes`, { recording_id: currentRecording.id, barcode_data: bc, video_timestamp: ts, frame_code: frameCount }); } catch {}
+    try {
+      await axios.post(`${API_URL}/api/barcodes`, {
+        recording_id: currentRecording.id,
+        barcode_data: bc,
+        video_timestamp: ts,
+        frame_code: frameCount,
+      });
+    } catch {}
     setBarcodeCount(p => p + 1);
     setBarcodeInput('');
-    showToast(`✓ ${bc}`);
+    showToast(`Visitor: ${bc}`);
     barcodeInputRef.current?.focus();
   };
 
   const handleLogout = async () => {
-    if (isRecording) { showToast('Stop recording first'); return; }
+    if (isRecording) {
+      Alert.alert('Recording Active', 'Please stop recording before exiting.');
+      return;
+    }
     await AsyncStorage.removeItem('xow_device');
     router.replace('/');
   };
 
   if (!cameraPermission?.granted) {
     return (
-      <View style={[styles.container, { width, height, justifyContent: 'center', alignItems: 'center' }]}> 
+      <View style={[styles.container, { width, height, justifyContent: 'center', alignItems: 'center' }]}>
         <Ionicons name="videocam-off" size={40} color="#8B5CF6" />
-        <Text style={{ color: '#fff', marginTop: 12, fontSize: 16 }}>Camera Required</Text>
+        <Text style={{ color: '#fff', marginTop: 12, fontSize: 16 }}>Camera Permission Required</Text>
         <TouchableOpacity onPress={requestCameraPermission} style={{ marginTop: 16, backgroundColor: '#8B5CF6', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}>
-          <Text style={{ color: '#fff' }}>Enable</Text>
+          <Text style={{ color: '#fff', fontWeight: '600' }}>Enable Camera</Text>
         </TouchableOpacity>
       </View>
     );
   }
 
-  const panelWidth = Math.min(130, width * 0.14);
+  const panelWidth = Math.min(140, width * 0.15);
 
   return (
     <View style={[styles.container, { width, height }]}>
+      {/* Camera View with Overlays */}
       <View style={[styles.cameraArea, { width: width - panelWidth }]}>
-        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
-        
-        {/* Top Bar */}
+        <CameraView
+          ref={cameraRef}
+          style={StyleSheet.absoluteFill}
+          facing="back"
+          mode="video"
+        />
+
+        {/* Top Bar - Device Info, Recording Status, Connection */}
         <View style={styles.topBar}>
           <View style={styles.deviceSection}>
             <View style={styles.idBadge}>
@@ -206,10 +362,10 @@ export default function RecorderScreen() {
             </View>
           </View>
           {isRecording && (
-            <View style={styles.recBadge}>
+            <Animated.View style={[styles.recBadge, { opacity: new Animated.Value(1) }]}>
               <View style={styles.recDot} />
               <Text style={styles.recText}>REC</Text>
-            </View>
+            </Animated.View>
           )}
           <View style={[styles.statusBadge, isOnline ? styles.online : styles.offline]}>
             <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
@@ -217,7 +373,7 @@ export default function RecorderScreen() {
           </View>
         </View>
 
-        {/* Timecode */}
+        {/* Timecode Overlay - Top Left */}
         <View style={styles.tcBox}>
           <Text style={styles.tcLabel}>DATE</Text>
           <Text style={styles.tcVal}>{formatDate(currentTime)}</Text>
@@ -226,7 +382,7 @@ export default function RecorderScreen() {
           {isRecording && (
             <>
               <View style={styles.tcDiv} />
-              <Text style={styles.tcLabel}>TC</Text>
+              <Text style={styles.tcLabel}>TIMECODE</Text>
               <Text style={[styles.tcVal, { color: '#EF4444' }]}>{formatTC(recordingTime)}</Text>
               <Text style={styles.tcLabel}>FRAME</Text>
               <Text style={[styles.tcVal, { color: '#8B5CF6', fontSize: 9 }]}>{frameCount.toString().padStart(6, '0')}</Text>
@@ -234,43 +390,69 @@ export default function RecorderScreen() {
           )}
         </View>
 
-        {/* Watermark */}
+        {/* XoW Watermark - Bottom Right */}
         <View style={styles.watermark}>
           <View style={styles.wmIcon}>
-            <Ionicons name="videocam" size={10} color="#fff" />
+            <Ionicons name="videocam" size={12} color="#fff" />
           </View>
           <Text style={styles.wmText}>XoW</Text>
+          {isRecording && <Text style={styles.wmLive}>LIVE</Text>}
         </View>
 
-        {/* Visitor Count */}
+        {/* Visitor Count - Bottom Left */}
         {isRecording && (
           <View style={styles.visitorBox}>
-            <Ionicons name="people" size={14} color="#8B5CF6" />
+            <Ionicons name="people" size={16} color="#8B5CF6" />
             <Text style={styles.visitorNum}>{barcodeCount}</Text>
             <Text style={styles.visitorLabel}>visitors</Text>
           </View>
         )}
 
-        {/* Toast */}
+        {/* Recording Duration - Center Bottom */}
+        {isRecording && (
+          <View style={styles.durationBox}>
+            <Text style={styles.durationText}>{formatTC(recordingTime).slice(0, 8)}</Text>
+          </View>
+        )}
+
+        {/* Upload Progress */}
+        {isUploading && (
+          <View style={styles.uploadOverlay}>
+            <View style={styles.uploadBox}>
+              <Ionicons name="cloud-upload" size={32} color="#8B5CF6" />
+              <Text style={styles.uploadTitle}>Uploading & Processing</Text>
+              <View style={styles.progressBar}>
+                <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+              </View>
+              <Text style={styles.uploadPercent}>{uploadProgress}%</Text>
+            </View>
+          </View>
+        )}
+
+        {/* Toast Notification */}
         {toastVisible && (
           <Animated.View style={[styles.toast, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
-            <Ionicons name="checkmark-circle" size={14} color="#10B981" />
+            <Ionicons name="checkmark-circle" size={16} color="#10B981" />
             <Text style={styles.toastText}>{toastMessage}</Text>
           </Animated.View>
         )}
       </View>
 
-      {/* Control Panel */}
+      {/* Control Panel - Right Side */}
       <View style={[styles.panel, { width: panelWidth }]}>
-        <Text style={styles.boothName} numberOfLines={1}>{device?.name || 'Booth'}</Text>
-        
+        <View>
+          <Text style={styles.boothName} numberOfLines={1}>{device?.name || 'Booth'}</Text>
+          <Text style={styles.boothSub}>Expo Recording</Text>
+        </View>
+
+        {/* Visitor Scan Input */}
         <View style={styles.section}>
-          <Text style={styles.secLabel}>VISITOR SCAN</Text>
+          <Text style={styles.secLabel}>VISITOR BADGE</Text>
           <View style={styles.inputRow}>
             <TextInput
               ref={barcodeInputRef}
               style={styles.input}
-              placeholder="Badge"
+              placeholder="Scan/Enter"
               placeholderTextColor="#444"
               value={barcodeInput}
               onChangeText={setBarcodeInput}
@@ -278,26 +460,52 @@ export default function RecorderScreen() {
               autoCapitalize="characters"
               editable={isRecording}
             />
-            <TouchableOpacity style={[styles.addBtn, !isRecording && { backgroundColor: '#333' }]} onPress={handleBarcode} disabled={!isRecording}>
-              <Ionicons name="add" size={14} color="#fff" />
+            <TouchableOpacity
+              style={[styles.addBtn, !isRecording && { backgroundColor: '#333' }]}
+              onPress={handleBarcode}
+              disabled={!isRecording}
+            >
+              <Ionicons name="add" size={16} color="#fff" />
             </TouchableOpacity>
           </View>
+          {isRecording && barcodeCount > 0 && (
+            <Text style={styles.scanCount}>{barcodeCount} scanned</Text>
+          )}
         </View>
 
-        <TouchableOpacity style={[styles.recBtn, isRecording && styles.recBtnActive]} onPress={isRecording ? stopRecording : startRecording} disabled={isUploading}>
-          <View style={[styles.recBtnInner, isRecording && styles.recBtnInnerActive]}>
-            {isUploading ? <Ionicons name="cloud-upload" size={18} color="#fff" /> : isRecording ? <View style={styles.stopIcon} /> : <View style={styles.recordIcon} />}
-          </View>
-        </TouchableOpacity>
-        <Text style={styles.recLabel}>{isUploading ? 'UPLOADING' : isRecording ? 'STOP' : 'RECORD'}</Text>
+        {/* Record/Stop Button */}
+        <View style={styles.recSection}>
+          <TouchableOpacity
+            style={[styles.recBtn, isRecording && styles.recBtnActive]}
+            onPress={isRecording ? stopRecording : startRecording}
+            disabled={isUploading}
+          >
+            <View style={[styles.recBtnInner, isRecording && styles.recBtnInnerActive]}>
+              {isUploading ? (
+                <Ionicons name="cloud-upload" size={20} color="#fff" />
+              ) : isRecording ? (
+                <View style={styles.stopIcon} />
+              ) : (
+                <View style={styles.recordIcon} />
+              )}
+            </View>
+          </TouchableOpacity>
+          <Text style={styles.recLabel}>
+            {isUploading ? 'UPLOADING' : isRecording ? 'STOP' : 'RECORD'}
+          </Text>
+          {isRecording && (
+            <Text style={styles.recHint}>Tap to stop & upload</Text>
+          )}
+        </View>
 
+        {/* Bottom Actions */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actBtn} onPress={() => router.push('/gallery')}>
-            <Ionicons name="folder" size={16} color="#fff" />
+            <Ionicons name="folder" size={18} color="#fff" />
             <Text style={styles.actLabel}>Gallery</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actBtn} onPress={handleLogout}>
-            <Ionicons name="power" size={16} color="#EF4444" />
+            <Ionicons name="power" size={18} color="#EF4444" />
             <Text style={[styles.actLabel, { color: '#EF4444' }]}>Exit</Text>
           </TouchableOpacity>
         </View>
@@ -309,49 +517,81 @@ export default function RecorderScreen() {
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', backgroundColor: '#000' },
   cameraArea: { flex: 1, position: 'relative' },
-  topBar: { position: 'absolute', top: 8, left: 8, right: 8, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
+  
+  // Top Bar
+  topBar: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   deviceSection: { gap: 4 },
-  idBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, gap: 3 },
-  idText: { color: '#fff', fontSize: 9, fontWeight: '700' },
-  brandBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.3)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3, gap: 3 },
-  brandText: { color: '#8B5CF6', fontSize: 8, fontWeight: '800' },
-  recBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#DC2626', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, gap: 4 },
-  recDot: { width: 6, height: 6, borderRadius: 3, backgroundColor: '#fff' },
-  recText: { color: '#fff', fontSize: 9, fontWeight: '800' },
-  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, gap: 3 },
+  idBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, gap: 4 },
+  idText: { color: '#fff', fontSize: 10, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  brandBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.4)', paddingHorizontal: 6, paddingVertical: 3, borderRadius: 4, gap: 3 },
+  brandText: { color: '#8B5CF6', fontSize: 9, fontWeight: '800' },
+  recBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#DC2626', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4, gap: 5 },
+  recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
+  recText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, gap: 4 },
   online: { backgroundColor: 'rgba(16,185,129,0.3)' },
   offline: { backgroundColor: 'rgba(239,68,68,0.3)' },
-  statusDot: { width: 5, height: 5, borderRadius: 3 },
+  statusDot: { width: 6, height: 6, borderRadius: 3 },
   onlineDot: { backgroundColor: '#10B981' },
   offlineDot: { backgroundColor: '#EF4444' },
-  statusText: { color: '#fff', fontSize: 8, fontWeight: '700' },
-  tcBox: { position: 'absolute', top: 50, left: 8, backgroundColor: 'rgba(0,0,0,0.85)', padding: 6, borderRadius: 4, borderLeftWidth: 2, borderLeftColor: '#8B5CF6' },
-  tcLabel: { color: '#666', fontSize: 7, fontWeight: '600' },
-  tcVal: { color: '#fff', fontSize: 10, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace', marginBottom: 1 },
-  tcDiv: { height: 1, backgroundColor: '#333', marginVertical: 3 },
-  watermark: { position: 'absolute', bottom: 8, right: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.9)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, gap: 4 },
-  wmIcon: { width: 16, height: 16, borderRadius: 4, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
-  wmText: { color: '#fff', fontSize: 11, fontWeight: '800', letterSpacing: 1 },
-  visitorBox: { position: 'absolute', bottom: 8, left: 8, backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, flexDirection: 'row', alignItems: 'center', gap: 6 },
-  visitorNum: { color: '#fff', fontSize: 18, fontWeight: '800' },
-  visitorLabel: { color: '#666', fontSize: 8 },
-  toast: { position: 'absolute', bottom: 50, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.9)', paddingHorizontal: 16, paddingVertical: 10, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8, borderWidth: 1, borderColor: '#10B981' },
-  toastText: { color: '#fff', fontSize: 12, fontWeight: '600' },
-  panel: { backgroundColor: '#0a0a0a', borderLeftWidth: 1, borderLeftColor: '#1a1a1a', padding: 10, justifyContent: 'space-between' },
-  boothName: { color: '#fff', fontSize: 10, fontWeight: '600', textAlign: 'center', marginBottom: 8, backgroundColor: '#111', paddingVertical: 4, borderRadius: 4 },
-  section: { marginBottom: 10 },
-  secLabel: { color: '#555', fontSize: 7, fontWeight: '700', marginBottom: 4 },
-  inputRow: { flexDirection: 'row', gap: 3 },
-  input: { flex: 1, backgroundColor: '#111', borderRadius: 4, paddingHorizontal: 6, paddingVertical: 6, color: '#fff', fontSize: 10, borderWidth: 1, borderColor: '#222' },
-  addBtn: { width: 26, height: 26, borderRadius: 4, backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center' },
-  recBtn: { width: 56, height: 56, borderRadius: 28, backgroundColor: 'rgba(139,92,246,0.2)', justifyContent: 'center', alignItems: 'center', alignSelf: 'center', borderWidth: 2, borderColor: '#8B5CF6' },
+  statusText: { color: '#fff', fontSize: 9, fontWeight: '700' },
+  
+  // Timecode Box
+  tcBox: { position: 'absolute', top: 55, left: 10, backgroundColor: 'rgba(0,0,0,0.9)', padding: 8, borderRadius: 6, borderLeftWidth: 3, borderLeftColor: '#8B5CF6' },
+  tcLabel: { color: '#666', fontSize: 8, fontWeight: '600', marginTop: 2 },
+  tcVal: { color: '#fff', fontSize: 12, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  tcDiv: { height: 1, backgroundColor: '#333', marginVertical: 4 },
+  
+  // Watermark
+  watermark: { position: 'absolute', bottom: 12, right: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.95)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, gap: 6 },
+  wmIcon: { width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
+  wmText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  wmLive: { color: '#fff', fontSize: 8, fontWeight: '700', backgroundColor: '#EF4444', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, marginLeft: 2 },
+  
+  // Visitor Box
+  visitorBox: { position: 'absolute', bottom: 12, left: 12, backgroundColor: 'rgba(0,0,0,0.9)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
+  visitorNum: { color: '#fff', fontSize: 22, fontWeight: '800' },
+  visitorLabel: { color: '#666', fontSize: 10 },
+  
+  // Duration Box
+  durationBox: { position: 'absolute', bottom: 12, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444' },
+  durationText: { color: '#EF4444', fontSize: 18, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  
+  // Upload Overlay
+  uploadOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
+  uploadBox: { backgroundColor: '#0a0a0a', padding: 30, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#1a1a1a' },
+  uploadTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 12, marginBottom: 20 },
+  progressBar: { width: 200, height: 6, backgroundColor: '#1a1a1a', borderRadius: 3, overflow: 'hidden' },
+  progressFill: { height: '100%', backgroundColor: '#8B5CF6', borderRadius: 3 },
+  uploadPercent: { color: '#8B5CF6', fontSize: 14, fontWeight: '700', marginTop: 8 },
+  
+  // Toast
+  toast: { position: 'absolute', bottom: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.95)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#10B981' },
+  toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
+  
+  // Control Panel
+  panel: { backgroundColor: '#0a0a0a', borderLeftWidth: 1, borderLeftColor: '#1a1a1a', padding: 12, justifyContent: 'space-between' },
+  boothName: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
+  boothSub: { color: '#666', fontSize: 9, textAlign: 'center', marginTop: 2 },
+  
+  section: { marginTop: 16 },
+  secLabel: { color: '#555', fontSize: 8, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
+  inputRow: { flexDirection: 'row', gap: 4 },
+  input: { flex: 1, backgroundColor: '#111', borderRadius: 6, paddingHorizontal: 8, paddingVertical: 8, color: '#fff', fontSize: 11, borderWidth: 1, borderColor: '#222' },
+  addBtn: { width: 32, height: 32, borderRadius: 6, backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center' },
+  scanCount: { color: '#8B5CF6', fontSize: 9, marginTop: 4, textAlign: 'center' },
+  
+  recSection: { alignItems: 'center' },
+  recBtn: { width: 64, height: 64, borderRadius: 32, backgroundColor: 'rgba(139,92,246,0.2)', justifyContent: 'center', alignItems: 'center', borderWidth: 3, borderColor: '#8B5CF6' },
   recBtnActive: { backgroundColor: 'rgba(239,68,68,0.2)', borderColor: '#EF4444' },
-  recBtnInner: { width: 40, height: 40, borderRadius: 20, backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center' },
-  recBtnInnerActive: { backgroundColor: '#EF4444', borderRadius: 6, width: 28, height: 28 },
-  recordIcon: { width: 16, height: 16, borderRadius: 8, backgroundColor: '#fff' },
-  stopIcon: { width: 12, height: 12, borderRadius: 2, backgroundColor: '#fff' },
-  recLabel: { color: '#888', fontSize: 8, fontWeight: '700', textAlign: 'center', marginTop: 4 },
-  actions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
-  actBtn: { alignItems: 'center', padding: 6 },
-  actLabel: { color: '#888', fontSize: 8, marginTop: 2 },
+  recBtnInner: { width: 48, height: 48, borderRadius: 24, backgroundColor: '#8B5CF6', justifyContent: 'center', alignItems: 'center' },
+  recBtnInnerActive: { backgroundColor: '#EF4444', borderRadius: 8, width: 32, height: 32 },
+  recordIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
+  stopIcon: { width: 14, height: 14, borderRadius: 2, backgroundColor: '#fff' },
+  recLabel: { color: '#888', fontSize: 10, fontWeight: '700', textAlign: 'center', marginTop: 6, letterSpacing: 0.5 },
+  recHint: { color: '#555', fontSize: 8, marginTop: 2 },
+  
+  actions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
+  actBtn: { alignItems: 'center', padding: 8 },
+  actLabel: { color: '#888', fontSize: 9, marginTop: 3 },
 });
