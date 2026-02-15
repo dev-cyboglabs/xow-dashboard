@@ -874,6 +874,23 @@ async def get_audio(recording_id: str):
         
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
         
+        # Get file metadata to determine correct content type
+        file_info = await db.fs.files.find_one({"_id": ObjectId(recording['audio_file_id'])})
+        filename = file_info.get('filename', '') if file_info else ''
+        
+        # Determine content type based on file extension or default to mp4
+        if filename.endswith('.webm'):
+            content_type = "audio/webm"
+        elif filename.endswith('.mp3'):
+            content_type = "audio/mpeg"
+        elif filename.endswith('.wav'):
+            content_type = "audio/wav"
+        elif filename.endswith('.ogg'):
+            content_type = "audio/ogg"
+        else:
+            # Default to mp4/m4a which is most common from mobile recordings
+            content_type = "audio/mp4"
+        
         async def stream_audio():
             while True:
                 chunk = await grid_out.read(1024 * 1024)  # 1MB chunks
@@ -883,8 +900,8 @@ async def get_audio(recording_id: str):
         
         return StreamingResponse(
             stream_audio(),
-            media_type="audio/webm",
-            headers={"Content-Disposition": f"inline; filename=audio_{recording_id}.webm"}
+            media_type=content_type,
+            headers={"Content-Disposition": f"inline; filename=audio_{recording_id}.m4a"}
         )
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
