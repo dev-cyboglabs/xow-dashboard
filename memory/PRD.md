@@ -146,15 +146,34 @@ Using OpenAI Whisper + GPT-4o for accurate speaker separation:
 }
 ```
 
+## Completed Features (Dec 15, 2025)
+
+### Mobile App Recording & Upload
+- **Video Recording**: Using `expo-camera` CameraView.recordAsync() for video capture
+- **Audio Recording**: Using `expo-av` Audio.Recording for high-quality audio
+- **Automatic Upload**: Files uploaded to backend after recording stops
+- **Progress Indicator**: Upload progress shown with percentage
+
+### Video Overlay System
+- **XoW Watermark**: Purple branded badge with camera icon in bottom-right
+- **Timestamp Overlay**: Date, time displayed in top-left corner
+- **Timecode**: Recording duration with frame count (HH:MM:SS:FF format)
+- **Device ID Badge**: Shows connected device identifier
+- **Recording Indicator**: Red "REC" badge when actively recording
+- **Visitor Counter**: Shows number of badge scans during recording
+- **LIVE Badge**: Indicates active recording status
+
+### Gallery Enhancements
+- **Status Indicators**: Visual badges for recording/completed/uploaded/processing/processed/error
+- **Media Icons**: Shows video and audio availability
+- **AI Status**: Displays speaker count, host identification badge
+- **Summary Preview**: Shows AI-generated summary for processed recordings
+- **Reprocess Button**: Retry AI analysis for failed recordings
+
 ## Upcoming Tasks (Backlog)
 
 ### P0 - Critical
-(None - core features completed)
-
-### P1 - High Priority
-1. **Mobile App Recording**: Implement actual video/audio recording in React Native
-2. **Mobile App Upload**: Upload recorded files to backend
-3. **Video Overlay**: Add timestamp, watermark, "XoW" branding to video
+(None - all core features completed)
 
 ### P2 - Medium Priority
 1. **Barcode Scanner Integration**: Implement barcode scanning in mobile app
