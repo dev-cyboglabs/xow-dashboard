@@ -6,8 +6,6 @@ import {
   TouchableOpacity,
   StyleSheet,
   ActivityIndicator,
-  KeyboardAvoidingView,
-  Platform,
   Alert,
   Dimensions,
 } from 'react-native';
@@ -16,7 +14,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
 
-const { width } = Dimensions.get('window');
+const { width, height } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export default function LoginScreen() {
@@ -36,7 +34,7 @@ export default function LoginScreen() {
     try {
       const savedDevice = await AsyncStorage.getItem('xow_device');
       if (savedDevice) {
-        router.replace('/main');
+        router.replace('/recorder');
       }
     } catch (error) {
       console.log('No existing login');
@@ -58,14 +56,10 @@ export default function LoginScreen() {
 
       if (response.data.success) {
         await AsyncStorage.setItem('xow_device', JSON.stringify(response.data.device));
-        router.replace('/main');
+        router.replace('/recorder');
       }
     } catch (error: any) {
-      console.error('Login error:', error);
-      Alert.alert(
-        'Login Failed',
-        error.response?.data?.detail || 'Invalid Device ID or Password'
-      );
+      Alert.alert('Login Failed', error.response?.data?.detail || 'Invalid credentials');
     } finally {
       setIsLoading(false);
     }
@@ -79,21 +73,16 @@ export default function LoginScreen() {
 
     setIsLoading(true);
     try {
-      const response = await axios.post(`${API_URL}/api/auth/register`, {
+      await axios.post(`${API_URL}/api/auth/register`, {
         device_id: deviceId.trim(),
         password: password.trim(),
         name: deviceName.trim(),
       });
-
-      Alert.alert('Success', 'Device registered successfully! You can now login.');
+      Alert.alert('Success', 'Device registered! You can now login.');
       setIsRegistering(false);
       setDeviceName('');
     } catch (error: any) {
-      console.error('Register error:', error);
-      Alert.alert(
-        'Registration Failed',
-        error.response?.data?.detail || 'Could not register device'
-      );
+      Alert.alert('Registration Failed', error.response?.data?.detail || 'Could not register');
     } finally {
       setIsLoading(false);
     }
@@ -101,32 +90,61 @@ export default function LoginScreen() {
 
   return (
     <View style={styles.container}>
-      <KeyboardAvoidingView
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
-        style={styles.content}
-      >
-        {/* Logo and Title */}
-        <View style={styles.header}>
-          <View style={styles.logoContainer}>
-            <Ionicons name="videocam" size={32} color="#fff" />
+      {/* Background Grid Pattern */}
+      <View style={styles.gridPattern}>
+        {[...Array(20)].map((_, i) => (
+          <View key={i} style={styles.gridLine} />
+        ))}
+      </View>
+
+      {/* Left Panel - Branding */}
+      <View style={styles.leftPanel}>
+        <View style={styles.brandContainer}>
+          <View style={styles.logoBox}>
+            <Ionicons name="videocam" size={48} color="#fff" />
           </View>
-          <Text style={styles.title}>XoW</Text>
-          <Text style={styles.subtitle}>Booth Recording System</Text>
+          <Text style={styles.brandName}>XoW</Text>
+          <Text style={styles.brandTagline}>Professional Booth Recording System</Text>
+        </View>
+        
+        <View style={styles.featureList}>
+          <View style={styles.featureItem}>
+            <Ionicons name="recording" size={20} color="#7C3AED" />
+            <Text style={styles.featureText}>HD Video Recording</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Ionicons name="barcode" size={20} color="#7C3AED" />
+            <Text style={styles.featureText}>Visitor Tracking</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Ionicons name="cloud-upload" size={20} color="#7C3AED" />
+            <Text style={styles.featureText}>Cloud Sync</Text>
+          </View>
+          <View style={styles.featureItem}>
+            <Ionicons name="analytics" size={20} color="#7C3AED" />
+            <Text style={styles.featureText}>AI Analytics</Text>
+          </View>
         </View>
 
-        {/* Login Form */}
-        <View style={styles.formContainer}>
-          <Text style={styles.formTitle}>
-            {isRegistering ? 'Register Device' : 'Sign In'}
+        <Text style={styles.version}>v1.0.0</Text>
+      </View>
+
+      {/* Right Panel - Login Form */}
+      <View style={styles.rightPanel}>
+        <View style={styles.formCard}>
+          <Text style={styles.formTitle}>{isRegistering ? 'Register Device' : 'Device Login'}</Text>
+          <Text style={styles.formSubtitle}>
+            {isRegistering ? 'Setup a new recording device' : 'Enter your device credentials'}
           </Text>
-          
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Device ID</Text>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>DEVICE ID</Text>
             <View style={styles.inputWrapper}>
+              <Ionicons name="hardware-chip-outline" size={20} color="#7C3AED" />
               <TextInput
                 style={styles.input}
                 placeholder="Enter device ID"
-                placeholderTextColor="#666"
+                placeholderTextColor="#4B5563"
                 value={deviceId}
                 onChangeText={setDeviceId}
                 autoCapitalize="none"
@@ -134,38 +152,33 @@ export default function LoginScreen() {
             </View>
           </View>
 
-          <View style={styles.inputContainer}>
-            <Text style={styles.inputLabel}>Password</Text>
+          <View style={styles.inputGroup}>
+            <Text style={styles.inputLabel}>PASSWORD</Text>
             <View style={styles.inputWrapper}>
+              <Ionicons name="lock-closed-outline" size={20} color="#7C3AED" />
               <TextInput
                 style={styles.input}
                 placeholder="Enter password"
-                placeholderTextColor="#666"
+                placeholderTextColor="#4B5563"
                 value={password}
                 onChangeText={setPassword}
                 secureTextEntry={!showPassword}
               />
-              <TouchableOpacity
-                onPress={() => setShowPassword(!showPassword)}
-                style={styles.eyeIcon}
-              >
-                <Ionicons
-                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                  size={20}
-                  color="#666"
-                />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)}>
+                <Ionicons name={showPassword ? 'eye-outline' : 'eye-off-outline'} size={20} color="#6B7280" />
               </TouchableOpacity>
             </View>
           </View>
 
           {isRegistering && (
-            <View style={styles.inputContainer}>
-              <Text style={styles.inputLabel}>Booth Name</Text>
+            <View style={styles.inputGroup}>
+              <Text style={styles.inputLabel}>BOOTH NAME</Text>
               <View style={styles.inputWrapper}>
+                <Ionicons name="business-outline" size={20} color="#7C3AED" />
                 <TextInput
                   style={styles.input}
                   placeholder="e.g., Tech Expo - Booth A1"
-                  placeholderTextColor="#666"
+                  placeholderTextColor="#4B5563"
                   value={deviceName}
                   onChangeText={setDeviceName}
                 />
@@ -174,7 +187,7 @@ export default function LoginScreen() {
           )}
 
           <TouchableOpacity
-            style={styles.loginButton}
+            style={styles.submitButton}
             onPress={isRegistering ? handleRegister : handleLogin}
             disabled={isLoading}
             activeOpacity={0.8}
@@ -182,33 +195,20 @@ export default function LoginScreen() {
             {isLoading ? (
               <ActivityIndicator color="#000" />
             ) : (
-              <Text style={styles.buttonText}>
-                {isRegistering ? 'Register' : 'Sign In'}
-              </Text>
+              <>
+                <Text style={styles.submitButtonText}>{isRegistering ? 'Register' : 'Connect'}</Text>
+                <Ionicons name="arrow-forward" size={20} color="#000" />
+              </>
             )}
           </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.switchButton}
-            onPress={() => {
-              setIsRegistering(!isRegistering);
-              setDeviceName('');
-            }}
-          >
+          <TouchableOpacity style={styles.switchButton} onPress={() => setIsRegistering(!isRegistering)}>
             <Text style={styles.switchText}>
-              {isRegistering
-                ? 'Already registered? Sign In'
-                : 'New device? Register'}
+              {isRegistering ? 'Already registered? Sign in' : 'New device? Register'}
             </Text>
           </TouchableOpacity>
         </View>
-
-        {/* Footer */}
-        <View style={styles.footer}>
-          <View style={styles.footerLine} />
-          <Text style={styles.footerText}>Secure Recording Platform</Text>
-        </View>
-      </KeyboardAvoidingView>
+      </View>
     </View>
   );
 }
@@ -216,84 +216,139 @@ export default function LoginScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000',
+    flexDirection: 'row',
+    backgroundColor: '#0A0A0A',
   },
-  content: {
+  gridPattern: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    opacity: 0.03,
+  },
+  gridLine: {
+    width: 50,
+    height: 50,
+    borderWidth: 1,
+    borderColor: '#fff',
+  },
+  leftPanel: {
     flex: 1,
+    padding: 40,
     justifyContent: 'center',
-    paddingHorizontal: 24,
+    borderRightWidth: 1,
+    borderRightColor: '#1F1F1F',
   },
-  header: {
-    alignItems: 'center',
-    marginBottom: 48,
+  brandContainer: {
+    marginBottom: 40,
   },
-  logoContainer: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+  logoBox: {
+    width: 80,
+    height: 80,
+    borderRadius: 20,
     backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 16,
+    marginBottom: 20,
   },
-  title: {
-    fontSize: 36,
-    fontWeight: '700',
+  brandName: {
+    fontSize: 56,
+    fontWeight: '800',
     color: '#fff',
-    letterSpacing: 2,
+    letterSpacing: 4,
   },
-  subtitle: {
-    fontSize: 14,
+  brandTagline: {
+    fontSize: 16,
     color: '#6B7280',
-    marginTop: 4,
+    marginTop: 8,
   },
-  formContainer: {
+  featureList: {
+    marginTop: 20,
+  },
+  featureItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 16,
+    gap: 12,
+  },
+  featureText: {
+    color: '#9CA3AF',
+    fontSize: 14,
+  },
+  version: {
+    position: 'absolute',
+    bottom: 40,
+    left: 40,
+    color: '#4B5563',
+    fontSize: 12,
+  },
+  rightPanel: {
+    flex: 1,
+    padding: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  formCard: {
     width: '100%',
     maxWidth: 400,
-    alignSelf: 'center',
+    backgroundColor: '#111111',
+    borderRadius: 24,
+    padding: 32,
+    borderWidth: 1,
+    borderColor: '#1F1F1F',
   },
   formTitle: {
     fontSize: 24,
-    fontWeight: '600',
+    fontWeight: '700',
     color: '#fff',
-    marginBottom: 24,
+    marginBottom: 8,
   },
-  inputContainer: {
+  formSubtitle: {
+    fontSize: 14,
+    color: '#6B7280',
+    marginBottom: 32,
+  },
+  inputGroup: {
     marginBottom: 20,
   },
   inputLabel: {
-    fontSize: 14,
-    color: '#9CA3AF',
+    fontSize: 11,
+    fontWeight: '600',
+    color: '#6B7280',
+    letterSpacing: 1,
     marginBottom: 8,
-    fontWeight: '500',
   },
   inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1F1F1F',
+    backgroundColor: '#1A1A1A',
     borderRadius: 12,
+    paddingHorizontal: 16,
     borderWidth: 1,
     borderColor: '#2D2D2D',
+    gap: 12,
   },
   input: {
     flex: 1,
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    fontSize: 16,
+    paddingVertical: 14,
+    fontSize: 15,
     color: '#fff',
   },
-  eyeIcon: {
-    paddingRight: 16,
-  },
-  loginButton: {
-    backgroundColor: '#fff',
+  submitButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: '#7C3AED',
     borderRadius: 12,
     paddingVertical: 16,
-    alignItems: 'center',
-    marginTop: 8,
+    marginTop: 12,
+    gap: 8,
   },
-  buttonText: {
-    color: '#000',
+  submitButtonText: {
+    color: '#fff',
     fontSize: 16,
     fontWeight: '600',
   },
@@ -304,24 +359,5 @@ const styles = StyleSheet.create({
   switchText: {
     color: '#7C3AED',
     fontSize: 14,
-    fontWeight: '500',
-  },
-  footer: {
-    position: 'absolute',
-    bottom: 40,
-    left: 24,
-    right: 24,
-    alignItems: 'center',
-  },
-  footerLine: {
-    width: 40,
-    height: 4,
-    backgroundColor: '#2D2D2D',
-    borderRadius: 2,
-    marginBottom: 12,
-  },
-  footerText: {
-    color: '#4B5563',
-    fontSize: 12,
   },
 });

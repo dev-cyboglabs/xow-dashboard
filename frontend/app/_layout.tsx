@@ -2,20 +2,26 @@ import React from 'react';
 import { Stack } from 'expo-router';
 import { StatusBar } from 'expo-status-bar';
 import { View, StyleSheet } from 'react-native';
+import * as ScreenOrientation from 'expo-screen-orientation';
 
 export default function RootLayout() {
+  React.useEffect(() => {
+    // Lock to landscape orientation
+    ScreenOrientation.lockAsync(ScreenOrientation.OrientationLock.LANDSCAPE);
+  }, []);
+
   return (
     <View style={styles.container}>
-      <StatusBar style="light" />
+      <StatusBar hidden />
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#000000' },
+          contentStyle: { backgroundColor: '#0A0A0A' },
           animation: 'fade',
         }}
       >
         <Stack.Screen name="index" />
-        <Stack.Screen name="main" />
+        <Stack.Screen name="recorder" />
         <Stack.Screen name="gallery" />
       </Stack>
     </View>
@@ -25,6 +31,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#000000',
+    backgroundColor: '#0A0A0A',
   },
 });
