@@ -262,6 +262,218 @@ If you cannot clearly distinguish separate conversations, create logical segment
         logger.error(f"Conversation detection error: {e}")
         return {"conversations": [], "total_interactions": 0, "main_topics": []}
 
+async def perform_speaker_diarization(transcript: str, barcode_scans: List[Dict], total_duration: float = 0) -> Dict[str, Any]:
+    """
+    Advanced speaker diarization using GPT to:
+    1. Separate speakers from transcript
+    2. Identify recurring "host" voice vs guests
+    3. Label speakers with names (if mentioned) or barcode IDs
+    4. Extract key points and topics for each speaker
+    """
+    if not transcript or not openai_client:
+        return {"speakers": [], "overall_summary": "", "host_identified": False}
+    
+    # Format barcode scans for context
+    barcode_context = ""
+    if barcode_scans:
+        barcode_context = "\n\nBarcode scans during recording (timestamp in seconds -> barcode ID):\n"
+        for scan in barcode_scans:
+            ts = scan.get('video_timestamp', 0) or 0
+            barcode_context += f"- {ts:.1f}s: {scan.get('barcode_data', 'Unknown')}\n"
+    
+    try:
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[
+                {"role": "system", "content": f"""You are an advanced AI analyzing expo booth recordings for speaker identification and conversation analysis.
+
+TOTAL RECORDING DURATION: {total_duration:.1f} seconds
+{barcode_context}
+
+YOUR TASKS:
+1. **Speaker Identification**: Identify distinct speakers in the transcript. Look for:
+   - Different speaking patterns, vocabulary, or topics
+   - Natural conversation turn-taking cues
+   - Introduction phrases like "Hi, I'm..." or "My name is..."
+   - Company/role mentions like "I work at..." or "I'm from..."
+
+2. **Host Identification**: The "host" is typically:
+   - The booth staff who speaks most frequently
+   - Uses welcoming phrases ("Welcome to our booth", "Let me show you...")
+   - Explains products/services consistently
+   - Mark one speaker as "is_host": true
+
+3. **Speaker Labeling Priority**:
+   - If someone says their name → Use that name
+   - If a barcode was scanned around their speaking time (±30 seconds) → Use barcode ID
+   - Otherwise → Use generic labels like "Guest 1", "Guest 2"
+
+4. **For each speaker, extract**:
+   - Their spoken content/dialogue segments
+   - Key topics they discussed
+   - Questions they asked
+   - Their apparent interests or concerns
+   - Company/organization if mentioned
+   - Sentiment (interested, skeptical, positive, neutral)
+
+5. **Overall Analysis**:
+   - Create an overall summary of all conversations
+   - Identify main discussion topics
+   - Note any follow-up actions mentioned
+
+Return JSON format:
+{{
+    "speakers": [
+        {{
+            "id": "speaker_1",
+            "label": "John Smith" or "BARCODE-12345" or "Guest 1",
+            "label_source": "name_mentioned" or "barcode_scan" or "auto_generated",
+            "is_host": true/false,
+            "company": "Acme Corp" or null,
+            "role": "Product Manager" or null,
+            "dialogue_segments": [
+                {{
+                    "start_percent": 0,
+                    "end_percent": 15,
+                    "content": "What they said...",
+                    "timestamp_label": "0:00 - 0:45"
+                }}
+            ],
+            "topics_discussed": ["product features", "pricing"],
+            "questions_asked": ["How does X work?"],
+            "key_points": ["Interested in feature Y", "Budget concern mentioned"],
+            "sentiment": "interested",
+            "total_speaking_time_percent": 30
+        }}
+    ],
+    "overall_summary": "Brief 2-3 sentence summary of all conversations",
+    "main_topics": ["topic1", "topic2"],
+    "host_identified": true/false,
+    "follow_up_actions": ["Send brochure to...", "Schedule demo..."],
+    "total_speakers": 3
+}}
+
+IMPORTANT: Be thorough in separating speakers. Even subtle cues like topic changes or question/answer patterns can indicate different speakers."""},
+                {"role": "user", "content": f"Transcript:\n{transcript}"}
+            ],
+            response_format={"type": "json_object"}
+        )
+        
+        result = json.loads(response.choices[0].message.content)
+        
+        # Convert percentages to actual timestamps for each speaker's segments
+        speakers = result.get('speakers', [])
+        for speaker in speakers:
+            for segment in speaker.get('dialogue_segments', []):
+                start_pct = segment.get('start_percent', 0)
+                end_pct = segment.get('end_percent', 0)
+                segment['start_time'] = (start_pct / 100) * total_duration
+                segment['end_time'] = (end_pct / 100) * total_duration
+        
+        return result
+    except Exception as e:
+        logger.error(f"Speaker diarization error: {e}")
+        return {"speakers": [], "overall_summary": "", "host_identified": False, "error": str(e)}
+
+async def process_transcription_with_diarization(recording_id: str):
+    """Background task to process transcription with advanced speaker diarization"""
+    try:
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording:
+            logger.error(f"Recording not found: {recording_id}")
+            return
+        
+        # Download audio
+        try:
+            grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
+            audio_data = await grid_out.read()
+        except Exception as e:
+            logger.error(f"Failed to download audio: {e}")
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {"status": "error", "error_message": "Failed to download audio file"}}
+            )
+            return
+        
+        # Step 1: Transcribe with Whisper
+        logger.info(f"Starting transcription for recording {recording_id}")
+        transcript = await transcribe_audio(audio_data)
+        
+        # Get duration for conversation detection
+        duration = recording.get('duration', 0) or 0
+        barcode_scans = recording.get('barcode_scans', []) or []
+        
+        # If transcript is empty, still mark as processed but skip AI analysis
+        if not transcript or transcript.strip() == "":
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {
+                    "transcript": "",
+                    "summary": "No speech detected in audio",
+                    "highlights": [],
+                    "speakers": [],
+                    "conversations": [],
+                    "status": "processed"
+                }}
+            )
+            logger.info(f"No speech detected for recording {recording_id}")
+            return
+        
+        # Step 2: Perform advanced speaker diarization
+        logger.info(f"Performing speaker diarization for recording {recording_id}")
+        diarization_result = await perform_speaker_diarization(transcript, barcode_scans, duration)
+        
+        # Step 3: Generate overall summary and highlights (keeping existing functionality)
+        analysis = await summarize_text(transcript)
+        
+        # Step 4: Also detect conversations for backward compatibility
+        conversation_data = await detect_conversations(transcript, duration)
+        conversations = conversation_data.get('conversations', []) if isinstance(conversation_data, dict) else []
+        
+        # Match barcode scans to conversations
+        for conv in conversations:
+            if isinstance(conv, dict):
+                conv_start = conv.get('start_time', 0) or 0
+                conv_end = conv.get('end_time', duration) or duration
+                matching_barcodes = []
+                for scan in barcode_scans:
+                    if isinstance(scan, dict):
+                        scan_ts = scan.get('video_timestamp', 0) or 0
+                        if conv_start - 5 <= scan_ts <= conv_end + 5:
+                            matching_barcodes.append(scan.get('barcode_data', ''))
+                conv['associated_barcodes'] = matching_barcodes
+        
+        # Update recording with all data
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {
+                "transcript": transcript,
+                "summary": analysis.get('summary', '') if isinstance(analysis, dict) else '',
+                "highlights": analysis.get('highlights', []) if isinstance(analysis, dict) else [],
+                "visitor_interests": analysis.get('visitor_interests', []) if isinstance(analysis, dict) else [],
+                "key_questions": analysis.get('key_questions', []) if isinstance(analysis, dict) else [],
+                # New speaker diarization data
+                "speakers": diarization_result.get('speakers', []),
+                "overall_summary": diarization_result.get('overall_summary', ''),
+                "host_identified": diarization_result.get('host_identified', False),
+                "follow_up_actions": diarization_result.get('follow_up_actions', []),
+                "total_speakers": diarization_result.get('total_speakers', 0),
+                # Existing conversation data
+                "conversations": conversations,
+                "total_interactions": conversation_data.get('total_interactions', 0) if isinstance(conversation_data, dict) else 0,
+                "main_topics": diarization_result.get('main_topics', []) or conversation_data.get('main_topics', []),
+                "status": "processed"
+            }}
+        )
+        
+        logger.info(f"Transcription with diarization completed for recording {recording_id}")
+    except Exception as e:
+        logger.error(f"Transcription with diarization error: {e}")
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {"status": "error", "error_message": str(e)}}
+        )
+
 # ==================== AUTH ENDPOINTS ====================
 
 @api_router.post("/auth/register")
