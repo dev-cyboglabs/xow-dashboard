@@ -599,12 +599,25 @@
                 // Show audio player
                 videoEl.classList.add('hidden');
                 audioContainer.classList.remove('hidden');
-                audioEl.src = `${API}/recordings/${id}/audio`;
+                document.getElementById('audio-error').classList.add('hidden');
+                
+                const audioUrl = `${API}/recordings/${id}/audio`;
+                audioEl.src = audioUrl;
                 modalType.textContent = 'Audio Only';
                 
+                // Set download link
+                document.getElementById('audio-download').href = audioUrl;
+                
                 audioEl.onloadeddata = () => {
+                    document.getElementById('audio-error').classList.add('hidden');
                     audioEl.currentTime = time;
                     audioEl.play().catch(e => console.log('Autoplay prevented'));
+                };
+                
+                // Handle audio error
+                audioEl.onerror = () => {
+                    console.log('Audio playback error');
+                    document.getElementById('audio-error').classList.remove('hidden');
                 };
             } else {
                 alert('No media available for this recording');
