@@ -637,10 +637,10 @@ async def reprocess_recording(recording_id: str, background_tasks: BackgroundTas
             {"$set": {"status": "processing"}}
         )
         
-        # Start background processing
-        background_tasks.add_task(process_transcription, recording_id)
+        # Start background processing with diarization
+        background_tasks.add_task(process_transcription_with_diarization, recording_id)
         
-        return {"success": True, "message": "Reprocessing started", "status": "processing"}
+        return {"success": True, "message": "Reprocessing started with speaker diarization", "status": "processing"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
