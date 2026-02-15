@@ -595,16 +595,42 @@ async def process_transcription(recording_id: str):
     """Background task to process transcription"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording:
+            logger.error(f"Recording not found: {recording_id}")
+            return
         
         # Download audio
-        grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
-        audio_data = await grid_out.read()
+        try:
+            grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
+            audio_data = await grid_out.read()
+        except Exception as e:
+            logger.error(f"Failed to download audio: {e}")
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {"status": "error", "error_message": "Failed to download audio file"}}
+            )
+            return
         
         # Transcribe
         transcript = await transcribe_audio(audio_data)
         
         # Get duration for conversation detection
         duration = recording.get('duration', 0) or 0
+        
+        # If transcript is empty, still mark as processed but skip AI analysis
+        if not transcript or transcript.strip() == "":
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {
+                    "transcript": "",
+                    "summary": "No speech detected in audio",
+                    "highlights": [],
+                    "conversations": [],
+                    "status": "processed"
+                }}
+            )
+            logger.info(f"No speech detected for recording {recording_id}")
+            return
         
         # Summarize
         analysis = await summarize_text(transcript)
@@ -614,31 +640,38 @@ async def process_transcription(recording_id: str):
         
         # Match barcode scans to conversations
         barcode_scans = recording.get('barcode_scans', [])
-        conversations = conversation_data.get('conversations', [])
+        if barcode_scans is None:
+            barcode_scans = []
+        
+        conversations = []
+        if isinstance(conversation_data, dict):
+            conversations = conversation_data.get('conversations', [])
         
         for conv in conversations:
-            conv_start = conv.get('start_time', 0)
-            conv_end = conv.get('end_time', duration)
-            # Find barcodes scanned during this conversation
-            matching_barcodes = [
-                scan for scan in barcode_scans 
-                if scan.get('video_timestamp', 0) >= conv_start - 5 
-                and scan.get('video_timestamp', 0) <= conv_end + 5
-            ]
-            conv['associated_barcodes'] = [b.get('barcode_data', '') for b in matching_barcodes]
+            if isinstance(conv, dict):
+                conv_start = conv.get('start_time', 0) or 0
+                conv_end = conv.get('end_time', duration) or duration
+                # Find barcodes scanned during this conversation
+                matching_barcodes = []
+                for scan in barcode_scans:
+                    if isinstance(scan, dict):
+                        scan_ts = scan.get('video_timestamp', 0) or 0
+                        if conv_start - 5 <= scan_ts <= conv_end + 5:
+                            matching_barcodes.append(scan.get('barcode_data', ''))
+                conv['associated_barcodes'] = matching_barcodes
         
         # Update recording
         await db.recordings.update_one(
             {"_id": ObjectId(recording_id)},
             {"$set": {
                 "transcript": transcript,
-                "summary": analysis.get('summary', ''),
-                "highlights": analysis.get('highlights', []),
-                "visitor_interests": analysis.get('visitor_interests', []),
-                "key_questions": analysis.get('key_questions', []),
+                "summary": analysis.get('summary', '') if isinstance(analysis, dict) else '',
+                "highlights": analysis.get('highlights', []) if isinstance(analysis, dict) else [],
+                "visitor_interests": analysis.get('visitor_interests', []) if isinstance(analysis, dict) else [],
+                "key_questions": analysis.get('key_questions', []) if isinstance(analysis, dict) else [],
                 "conversations": conversations,
-                "total_interactions": conversation_data.get('total_interactions', 0),
-                "main_topics": conversation_data.get('main_topics', []),
+                "total_interactions": conversation_data.get('total_interactions', 0) if isinstance(conversation_data, dict) else 0,
+                "main_topics": conversation_data.get('main_topics', []) if isinstance(conversation_data, dict) else [],
                 "status": "processed"
             }}
         )
@@ -648,7 +681,7 @@ async def process_transcription(recording_id: str):
         logger.error(f"Transcription processing error: {e}")
         await db.recordings.update_one(
             {"_id": ObjectId(recording_id)},
-            {"$set": {"status": "error"}}
+            {"$set": {"status": "error", "error_message": str(e)}}
         )
 
 @api_router.post("/recordings/{recording_id}/translate")
