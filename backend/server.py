@@ -118,6 +118,12 @@ def serialize_doc(doc):
     if doc is None:
         return None
     doc['id'] = str(doc.pop('_id'))
+    # Handle nested ObjectIds
+    if 'barcode_scans' in doc and doc['barcode_scans']:
+        doc['barcode_scans'] = [
+            {k: str(v) if isinstance(v, ObjectId) else v for k, v in scan.items()}
+            for scan in doc['barcode_scans']
+        ]
     return doc
 
 async def transcribe_audio(audio_data: bytes) -> str:
