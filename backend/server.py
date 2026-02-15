@@ -496,6 +496,51 @@ async def get_video(recording_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.get("/recordings/{recording_id}/audio")
+async def get_audio(recording_id: str):
+    """Stream audio file"""
+    try:
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording or not recording.get('audio_file_id'):
+            raise HTTPException(status_code=404, detail="Audio not found")
+        
+        grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
+        
+        async def stream_audio():
+            while True:
+                chunk = await grid_out.read(1024 * 1024)  # 1MB chunks
+                if not chunk:
+                    break
+                yield chunk
+        
+        return StreamingResponse(
+            stream_audio(),
+            media_type="audio/webm",
+            headers={"Content-Disposition": f"inline; filename=audio_{recording_id}.webm"}
+        )
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.get("/recordings/{recording_id}/status")
+async def get_recording_status(recording_id: str):
+    """Get recording processing status"""
+    try:
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording:
+            raise HTTPException(status_code=404, detail="Recording not found")
+        
+        return {
+            "id": recording_id,
+            "status": recording.get('status', 'unknown'),
+            "has_audio": recording.get('has_audio', False),
+            "has_video": recording.get('has_video', False),
+            "has_transcript": bool(recording.get('transcript')),
+            "has_summary": bool(recording.get('summary')),
+            "total_conversations": len(recording.get('conversations', []))
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 # ==================== BARCODE ENDPOINTS ====================
 
 @api_router.post("/barcodes")
