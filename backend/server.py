@@ -367,6 +367,65 @@ async def complete_recording(recording_id: str):
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+@api_router.delete("/recordings/{recording_id}")
+async def delete_recording(recording_id: str):
+    """Delete a recording and its associated files"""
+    try:
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording:
+            raise HTTPException(status_code=404, detail="Recording not found")
+        
+        # Delete video file from GridFS if exists
+        if recording.get('video_file_id'):
+            try:
+                await fs_bucket.delete(ObjectId(recording['video_file_id']))
+            except Exception as e:
+                logger.warning(f"Failed to delete video file: {e}")
+        
+        # Delete audio file from GridFS if exists
+        if recording.get('audio_file_id'):
+            try:
+                await fs_bucket.delete(ObjectId(recording['audio_file_id']))
+            except Exception as e:
+                logger.warning(f"Failed to delete audio file: {e}")
+        
+        # Delete associated barcode scans
+        await db.barcode_scans.delete_many({"recording_id": recording_id})
+        
+        # Delete video chunks if any
+        await db.video_chunks.delete_many({"recording_id": recording_id})
+        
+        # Delete the recording document
+        await db.recordings.delete_one({"_id": ObjectId(recording_id)})
+        
+        return {"success": True, "message": "Recording deleted successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.post("/recordings/{recording_id}/reprocess")
+async def reprocess_recording(recording_id: str, background_tasks: BackgroundTasks):
+    """Re-process a recording that had errors"""
+    try:
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording:
+            raise HTTPException(status_code=404, detail="Recording not found")
+        
+        if not recording.get('audio_file_id'):
+            raise HTTPException(status_code=400, detail="No audio file found for this recording")
+        
+        # Reset status to processing
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {"status": "processing"}}
+        )
+        
+        # Start background processing
+        background_tasks.add_task(process_transcription, recording_id)
+        
+        return {"success": True, "message": "Reprocessing started", "status": "processing"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
 @api_router.post("/recordings/{recording_id}/upload-video")
 async def upload_video(
     recording_id: str,
