@@ -413,8 +413,10 @@
             document.getElementById('modal-title').textContent = title;
             document.getElementById('modal-time').textContent = time > 0 ? `Starting at ${fmtDur(time)}` : '';
             
-            const v = document.getElementById('video');
-            v.src = `${API}/recordings/${id}/video`;
+            const videoEl = document.getElementById('video');
+            const audioContainer = document.getElementById('audio-container');
+            const audioEl = document.getElementById('audio');
+            const modalType = document.getElementById('modal-type');
             
             // Find recording and setup sidebar
             const rec = data.recordings.find(r => r.id === id);
@@ -422,6 +424,34 @@
             const convContainer = document.getElementById('video-conversations');
             const transcriptSection = document.getElementById('modal-transcript');
             const transcriptText = document.getElementById('transcript-text');
+            
+            // Determine if video or audio only
+            if (rec && rec.has_video) {
+                // Show video player
+                videoEl.classList.remove('hidden');
+                audioContainer.classList.add('hidden');
+                videoEl.src = `${API}/recordings/${id}/video`;
+                modalType.textContent = 'Video';
+                
+                videoEl.onloadeddata = () => {
+                    videoEl.currentTime = time;
+                    videoEl.play().catch(e => console.log('Autoplay prevented'));
+                };
+            } else if (rec && rec.has_audio) {
+                // Show audio player
+                videoEl.classList.add('hidden');
+                audioContainer.classList.remove('hidden');
+                audioEl.src = `${API}/recordings/${id}/audio`;
+                modalType.textContent = 'Audio Only';
+                
+                audioEl.onloadeddata = () => {
+                    audioEl.currentTime = time;
+                    audioEl.play().catch(e => console.log('Autoplay prevented'));
+                };
+            } else {
+                alert('No media available for this recording');
+                return;
+            }
             
             if (rec && rec.conversations && rec.conversations.length > 0) {
                 sidebar.classList.remove('hidden');
@@ -437,9 +467,77 @@
                 sidebar.classList.add('hidden');
             }
             
-            if (rec && rec.transcript) {
+            if (rec && rec.transcript && rec.transcript.trim()) {
                 transcriptSection.classList.remove('hidden');
                 transcriptText.textContent = rec.transcript;
+            } else {
+                transcriptSection.classList.add('hidden');
+            }
+            
+            document.getElementById('modal').classList.remove('hidden');
+            document.getElementById('modal').classList.add('flex');
+        }
+
+        function seekTo(time) {
+            const videoEl = document.getElementById('video');
+            const audioEl = document.getElementById('audio');
+            
+            if (!videoEl.classList.contains('hidden')) {
+                videoEl.currentTime = time;
+                videoEl.play().catch(e => console.log('Play prevented'));
+            } else {
+                audioEl.currentTime = time;
+                audioEl.play().catch(e => console.log('Play prevented'));
+            }
+        }
+
+        async function translateTranscript() {
+            if (!currentRecordingId) return;
+            
+            const targetLang = document.getElementById('translate-lang').value;
+            const btn = document.getElementById('translate-btn');
+            const transcriptText = document.getElementById('transcript-text');
+            const originalText = btn.textContent;
+            
+            // Check if there's a transcript
+            const rec = data.recordings.find(r => r.id === currentRecordingId);
+            if (!rec || !rec.transcript || !rec.transcript.trim()) {
+                alert('No transcript available to translate');
+                return;
+            }
+            
+            btn.textContent = 'Translating...';
+            btn.disabled = true;
+            
+            try {
+                const response = await fetch(`${API}/recordings/${currentRecordingId}/translate?target_language=${targetLang}`, {
+                    method: 'POST'
+                });
+                const result = await response.json();
+                
+                if (result.success && result.translated_transcript) {
+                    transcriptText.textContent = result.translated_transcript;
+                    btn.textContent = 'Translated!';
+                    setTimeout(() => { btn.textContent = 'Translate'; }, 2000);
+                } else {
+                    throw new Error(result.detail || 'Translation failed');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Translation failed: ' + e.message);
+                btn.textContent = originalText;
+            } finally {
+                btn.disabled = false;
+            }
+        }
+
+        function closeModal() {
+            document.getElementById('video').pause();
+            document.getElementById('audio').pause();
+            document.getElementById('modal').classList.add('hidden');
+            document.getElementById('modal').classList.remove('flex');
+            currentRecordingId = null;
+        }
             } else {
                 transcriptSection.classList.add('hidden');
             }
