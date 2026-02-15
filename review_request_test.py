@@ -5,7 +5,7 @@ import json
 from datetime import datetime
 
 # Backend URL
-BACKEND_URL = "https://expo-stall-hub.preview.emergentagent.com/api"
+BACKEND_URL = "https://diarize-analyze.preview.emergentagent.com/api"
 
 def test_review_request_endpoints():
     """Test the specific endpoints mentioned in the review request"""
