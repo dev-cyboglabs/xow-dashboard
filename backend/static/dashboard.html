@@ -482,8 +482,93 @@
                 completed: 'bg-yellow-500/20 text-yellow-400',
                 uploaded: 'bg-amber-500/20 text-amber-400',
                 processed: 'bg-[#8B5CF6]/20 text-[#8B5CF6]',
+                processing: 'bg-blue-500/20 text-blue-400',
                 error: 'bg-red-500/20 text-red-400'
             }[s] || 'bg-gray-500/20 text-gray-400';
+        }
+
+        async function deleteRecording(id, name) {
+            if (!confirm(`Are you sure you want to delete "${name}"?\n\nThis action cannot be undone.`)) {
+                return;
+            }
+            
+            try {
+                const response = await fetch(`${API}/recordings/${id}`, { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Remove from local data
+                    data.recordings = data.recordings.filter(r => r.id !== id);
+                    data.visitors = data.visitors.filter(v => v.recording_id !== id);
+                    
+                    // Remove card from DOM with animation
+                    const card = document.getElementById(`recording-${id}`);
+                    if (card) {
+                        card.style.transition = 'all 0.3s ease';
+                        card.style.opacity = '0';
+                        card.style.transform = 'translateX(-20px)';
+                        setTimeout(() => card.remove(), 300);
+                    }
+                    
+                    // Refresh insights
+                    const insights = await fetch(`${API}/dashboard/insights`).then(r => r.json());
+                    data.insights = insights;
+                    
+                    // Re-render if in overview
+                    if (view === 'overview') render();
+                } else {
+                    alert('Failed to delete recording: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to delete recording');
+            }
+        }
+
+        async function reprocessRecording(id) {
+            try {
+                const response = await fetch(`${API}/recordings/${id}/reprocess`, { method: 'POST' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    // Update status in local data
+                    const recording = data.recordings.find(r => r.id === id);
+                    if (recording) {
+                        recording.status = 'processing';
+                    }
+                    render();
+                    
+                    // Poll for status
+                    pollRecordingStatus(id);
+                } else {
+                    alert('Failed to reprocess: ' + (result.detail || 'Unknown error'));
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to reprocess recording');
+            }
+        }
+
+        async function pollRecordingStatus(id) {
+            const checkStatus = async () => {
+                try {
+                    const response = await fetch(`${API}/recordings/${id}/status`);
+                    const status = await response.json();
+                    
+                    const recording = data.recordings.find(r => r.id === id);
+                    if (recording && status.status !== 'processing') {
+                        // Refresh full data
+                        await refresh();
+                    } else if (status.status === 'processing') {
+                        // Check again in 3 seconds
+                        setTimeout(checkStatus, 3000);
+                    }
+                } catch (e) {
+                    console.error(e);
+                }
+            };
+            
+            setTimeout(checkStatus, 3000);
         }
 
         function sentimentClass(s) {
