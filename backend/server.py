@@ -558,8 +558,29 @@ async def process_transcription(recording_id: str):
         # Transcribe
         transcript = await transcribe_audio(audio_data)
         
+        # Get duration for conversation detection
+        duration = recording.get('duration', 0) or 0
+        
         # Summarize
         analysis = await summarize_text(transcript)
+        
+        # Detect and segment conversations
+        conversation_data = await detect_conversations(transcript, duration)
+        
+        # Match barcode scans to conversations
+        barcode_scans = recording.get('barcode_scans', [])
+        conversations = conversation_data.get('conversations', [])
+        
+        for conv in conversations:
+            conv_start = conv.get('start_time', 0)
+            conv_end = conv.get('end_time', duration)
+            # Find barcodes scanned during this conversation
+            matching_barcodes = [
+                scan for scan in barcode_scans 
+                if scan.get('video_timestamp', 0) >= conv_start - 5 
+                and scan.get('video_timestamp', 0) <= conv_end + 5
+            ]
+            conv['associated_barcodes'] = [b.get('barcode_data', '') for b in matching_barcodes]
         
         # Update recording
         await db.recordings.update_one(
@@ -568,6 +589,11 @@ async def process_transcription(recording_id: str):
                 "transcript": transcript,
                 "summary": analysis.get('summary', ''),
                 "highlights": analysis.get('highlights', []),
+                "visitor_interests": analysis.get('visitor_interests', []),
+                "key_questions": analysis.get('key_questions', []),
+                "conversations": conversations,
+                "total_interactions": conversation_data.get('total_interactions', 0),
+                "main_topics": conversation_data.get('main_topics', []),
                 "status": "processed"
             }}
         )
