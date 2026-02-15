@@ -642,6 +642,11 @@ async def health_check():
 # Include the router in the main app
 app.include_router(api_router)
 
+# Serve dashboard
+@app.get("/api/dashboard")
+async def serve_dashboard():
+    return FileResponse(ROOT_DIR / "static" / "dashboard.html")
+
 app.add_middleware(
     CORSMiddleware,
     allow_credentials=True,
