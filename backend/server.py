@@ -669,22 +669,23 @@ async def add_manual_transcript(recording_id: str, request: ManualTranscriptRequ
         raise HTTPException(status_code=400, detail=str(e))
 
 async def process_transcript_analysis(recording_id: str, transcript: str):
-    """Process transcript with AI for summarization and conversation detection"""
+    """Process transcript with AI for summarization, conversation detection, and speaker diarization"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
             return
         
         duration = recording.get('duration', 0) or 0
+        barcode_scans = recording.get('barcode_scans', []) or []
         
         # Summarize
         analysis = await summarize_text(transcript)
         
+        # Perform speaker diarization
+        diarization_result = await perform_speaker_diarization(transcript, barcode_scans, duration)
+        
         # Detect and segment conversations
         conversation_data = await detect_conversations(transcript, duration)
-        
-        # Match barcode scans to conversations
-        barcode_scans = recording.get('barcode_scans', []) or []
         conversations = conversation_data.get('conversations', []) if isinstance(conversation_data, dict) else []
         
         for conv in conversations:
@@ -699,7 +700,7 @@ async def process_transcript_analysis(recording_id: str, transcript: str):
                             matching_barcodes.append(scan.get('barcode_data', ''))
                 conv['associated_barcodes'] = matching_barcodes
         
-        # Update recording
+        # Update recording with all data including speaker diarization
         await db.recordings.update_one(
             {"_id": ObjectId(recording_id)},
             {"$set": {
@@ -707,22 +708,27 @@ async def process_transcript_analysis(recording_id: str, transcript: str):
                 "highlights": analysis.get('highlights', []) if isinstance(analysis, dict) else [],
                 "visitor_interests": analysis.get('visitor_interests', []) if isinstance(analysis, dict) else [],
                 "key_questions": analysis.get('key_questions', []) if isinstance(analysis, dict) else [],
+                # Speaker diarization data
+                "speakers": diarization_result.get('speakers', []),
+                "overall_summary": diarization_result.get('overall_summary', ''),
+                "host_identified": diarization_result.get('host_identified', False),
+                "follow_up_actions": diarization_result.get('follow_up_actions', []),
+                "total_speakers": diarization_result.get('total_speakers', 0),
+                # Conversation data
                 "conversations": conversations,
                 "total_interactions": conversation_data.get('total_interactions', 0) if isinstance(conversation_data, dict) else 0,
-                "main_topics": conversation_data.get('main_topics', []) if isinstance(conversation_data, dict) else [],
+                "main_topics": diarization_result.get('main_topics', []) or conversation_data.get('main_topics', []),
                 "status": "processed"
             }}
         )
         
-        logger.info(f"Manual transcript analysis completed for recording {recording_id}")
+        logger.info(f"Manual transcript analysis with diarization completed for recording {recording_id}")
     except Exception as e:
         logger.error(f"Manual transcript analysis error: {e}")
         await db.recordings.update_one(
             {"_id": ObjectId(recording_id)},
             {"$set": {"status": "error", "error_message": str(e)}}
         )
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
 
 @api_router.post("/recordings/{recording_id}/upload-video")
 async def upload_video(
