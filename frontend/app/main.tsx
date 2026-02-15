@@ -15,7 +15,6 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Audio } from 'expo-av';
-import * as FileSystem from 'expo-file-system';
 import axios from 'axios';
 
 const { width, height } = Dimensions.get('window');
