@@ -251,7 +251,7 @@
             const hasConversations = conversations.length > 0;
             
             return `
-            <div class="card rounded-xl overflow-hidden">
+            <div class="card rounded-xl overflow-hidden" id="recording-${r.id}">
                 <!-- Header -->
                 <div class="p-4 border-b border-[#1a1a1a] flex items-center justify-between">
                     <div class="flex items-center gap-4">
@@ -265,10 +265,18 @@
                     </div>
                     <div class="flex items-center gap-3">
                         <span class="text-xs px-3 py-1.5 rounded-full ${statusClass(r.status)}">${r.status}</span>
+                        ${r.status === 'error' ? `<button onclick="reprocessRecording('${r.id}')" class="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 rounded-lg text-white text-sm transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
+                            Retry
+                        </button>` : ''}
                         ${r.has_audio ? `<button onclick="playVideo('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2 bg-purple hover:bg-[#7C3AED] rounded-lg text-white text-sm transition-colors">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             Play
                         </button>` : ''}
+                        <button onclick="deleteRecording('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600 rounded-lg text-red-400 hover:text-white text-sm transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                            Delete
+                        </button>
                     </div>
                 </div>
                 
