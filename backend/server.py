@@ -874,24 +874,29 @@ async def get_audio(recording_id: str):
         
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
         
-        # Get file metadata to determine correct content type
-        file_info = await db.fs.files.find_one({"_id": ObjectId(recording['audio_file_id'])})
-        filename = file_info.get('filename', '') if file_info else ''
+        # Read first 32 bytes to detect actual format
+        header = await grid_out.read(32)
+        await grid_out.seek(0)  # Reset to beginning
         
-        # Determine content type based on file extension or default to mp4
-        if filename.endswith('.webm'):
-            content_type = "audio/webm"
-        elif filename.endswith('.mp3'):
-            content_type = "audio/mpeg"
-        elif filename.endswith('.wav'):
+        # Detect content type from file signature (magic bytes)
+        content_type = "audio/mp4"  # Default for mobile recordings
+        
+        if header[:4] == b'RIFF':
             content_type = "audio/wav"
-        elif filename.endswith('.ogg'):
+        elif header[:3] == b'ID3' or header[:2] == b'\xff\xfb':
+            content_type = "audio/mpeg"
+        elif header[:4] == b'OggS':
             content_type = "audio/ogg"
-        else:
-            # Default to mp4/m4a which is most common from mobile recordings
+        elif header[:4] == b'\x1aE\xdf\xa3':
+            content_type = "audio/webm"
+        elif b'ftyp' in header[:12]:
+            # MP4/M4A format
             content_type = "audio/mp4"
         
         async def stream_audio():
+            # Yield the header we already read
+            yield header
+            # Then stream the rest
             while True:
                 chunk = await grid_out.read(1024 * 1024)  # 1MB chunks
                 if not chunk:
