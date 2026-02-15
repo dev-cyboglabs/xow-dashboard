@@ -444,7 +444,8 @@ async def create_barcode_scan(scan: BarcodeScanCreate):
         "barcode_data": scan.barcode_data,
         "visitor_name": scan.visitor_name,
         "scan_time": datetime.utcnow(),
-        "video_timestamp": scan.video_timestamp
+        "video_timestamp": scan.video_timestamp,
+        "frame_code": scan.frame_code
     }
     result = await db.barcode_scans.insert_one(scan_doc)
     
