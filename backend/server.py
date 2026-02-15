@@ -28,11 +28,16 @@ db = client[os.environ['DB_NAME']]
 # GridFS for video storage
 fs_bucket = AsyncIOMotorGridFSBucket(db)
 
-# OpenAI client with Emergent key
+# OpenAI client with Emergent key (for text/chat only)
 openai_client = OpenAI(
     api_key=os.environ.get('EMERGENT_LLM_KEY', ''),
     base_url="https://llm.emergentmethods.ai/v1"
 )
+
+# Separate OpenAI client for Whisper (audio transcription)
+# Note: Emergent LLM key doesn't support audio - needs direct OpenAI key
+whisper_api_key = os.environ.get('OPENAI_API_KEY', '')
+whisper_client = OpenAI(api_key=whisper_api_key) if whisper_api_key else None
 
 # Create the main app
 app = FastAPI(title="XoW Expo Recording System")
