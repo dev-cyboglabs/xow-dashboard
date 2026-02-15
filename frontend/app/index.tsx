@@ -7,7 +7,7 @@ import {
   StyleSheet,
   ActivityIndicator,
   Alert,
-  Dimensions,
+  useWindowDimensions,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
@@ -18,6 +18,7 @@ const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 export default function LoginScreen() {
   const router = useRouter();
+  const { width, height } = useWindowDimensions();
   const [deviceId, setDeviceId] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
@@ -45,14 +46,12 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Enter Device ID and Password');
       return;
     }
-
     setIsLoading(true);
     try {
       const response = await axios.post(`${API_URL}/api/auth/login`, {
         device_id: deviceId.trim(),
         password: password.trim(),
       });
-
       if (response.data.success) {
         await AsyncStorage.setItem('xow_device', JSON.stringify(response.data.device));
         router.replace('/recorder');
@@ -69,7 +68,6 @@ export default function LoginScreen() {
       Alert.alert('Error', 'Fill all fields');
       return;
     }
-
     setIsLoading(true);
     try {
       await axios.post(`${API_URL}/api/auth/register`, {
@@ -88,68 +86,63 @@ export default function LoginScreen() {
   };
 
   return (
-    <View style={styles.container}>
-      {/* Left - Branding */}
+    <View style={[styles.container, { width, height }]}>
       <View style={styles.leftPanel}>
-        <View style={styles.logo}>
-          <Ionicons name="videocam" size={36} color="#fff" />
+        <View style={styles.brand}>
+          <View style={styles.logo}>
+            <Ionicons name="videocam" size={28} color="#fff" />
+          </View>
+          <Text style={styles.brandName}>XoW</Text>
+          <Text style={styles.tagline}>Booth Recording System</Text>
         </View>
-        <Text style={styles.brand}>XoW</Text>
-        <Text style={styles.tagline}>Booth Recording System</Text>
-        
         <View style={styles.features}>
           <View style={styles.feature}>
-            <Ionicons name="recording" size={16} color="#8B5CF6" />
+            <Ionicons name="recording" size={14} color="#8B5CF6" />
             <Text style={styles.featureText}>HD Recording</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="scan" size={16} color="#8B5CF6" />
+            <Ionicons name="scan" size={14} color="#8B5CF6" />
             <Text style={styles.featureText}>Visitor Tracking</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="cloud" size={16} color="#8B5CF6" />
+            <Ionicons name="cloud" size={14} color="#8B5CF6" />
             <Text style={styles.featureText}>Cloud Sync</Text>
           </View>
         </View>
       </View>
 
-      {/* Right - Form */}
       <View style={styles.rightPanel}>
-        <View style={styles.formCard}>
+        <View style={styles.form}>
           <Text style={styles.formTitle}>{isRegistering ? 'Register' : 'Login'}</Text>
           
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>DEVICE ID</Text>
-            <TextInput
-              style={styles.input}
-              placeholder="Enter ID"
-              placeholderTextColor="#444"
-              value={deviceId}
-              onChangeText={setDeviceId}
-              autoCapitalize="none"
-            />
-          </View>
+          <Text style={styles.label}>DEVICE ID</Text>
+          <TextInput
+            style={styles.input}
+            placeholder="Enter ID"
+            placeholderTextColor="#444"
+            value={deviceId}
+            onChangeText={setDeviceId}
+            autoCapitalize="none"
+          />
 
-          <View style={styles.inputGroup}>
-            <Text style={styles.inputLabel}>PASSWORD</Text>
-            <View style={styles.passwordRow}>
-              <TextInput
-                style={[styles.input, {flex: 1}]}
-                placeholder="Enter password"
-                placeholderTextColor="#444"
-                value={password}
-                onChangeText={setPassword}
-                secureTextEntry={!showPassword}
-              />
-              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
-                <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={18} color="#666" />
-              </TouchableOpacity>
-            </View>
+          <Text style={styles.label}>PASSWORD</Text>
+          <View style={styles.passwordRow}>
+            <TextInput
+              style={[styles.input, { flex: 1, marginBottom: 0 }]}
+              placeholder="Enter password"
+              placeholderTextColor="#444"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+            />
+            <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={styles.eyeBtn}>
+              <Ionicons name={showPassword ? 'eye' : 'eye-off'} size={16} color="#666" />
+            </TouchableOpacity>
           </View>
 
           {isRegistering && (
-            <View style={styles.inputGroup}>
-              <Text style={styles.inputLabel}>BOOTH NAME</Text>
+            <>
+              <Text style={styles.label}>BOOTH NAME</Text>
               <TextInput
                 style={styles.input}
                 placeholder="e.g., Tech Booth A1"
@@ -157,7 +150,7 @@ export default function LoginScreen() {
                 value={deviceName}
                 onChangeText={setDeviceName}
               />
-            </View>
+            </>
           )}
 
           <TouchableOpacity
@@ -195,102 +188,105 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRightWidth: 1,
     borderRightColor: '#1a1a1a',
-    padding: 24,
+    padding: 20,
+  },
+  brand: {
+    alignItems: 'center',
+    marginBottom: 24,
   },
   logo: {
-    width: 64,
-    height: 64,
-    borderRadius: 16,
+    width: 50,
+    height: 50,
+    borderRadius: 12,
     backgroundColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
-    marginBottom: 12,
+    marginBottom: 8,
   },
-  brand: {
-    fontSize: 42,
+  brandName: {
+    fontSize: 32,
     fontWeight: '800',
     color: '#fff',
   },
   tagline: {
-    fontSize: 12,
+    fontSize: 11,
     color: '#666',
-    marginBottom: 24,
   },
   features: {
-    gap: 10,
+    gap: 8,
   },
   feature: {
     flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
+    gap: 6,
   },
   featureText: {
     color: '#888',
-    fontSize: 12,
+    fontSize: 11,
   },
   rightPanel: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 24,
+    padding: 20,
   },
-  formCard: {
+  form: {
     width: '100%',
-    maxWidth: 320,
-    backgroundColor: '#0A0A0A',
-    borderRadius: 16,
-    padding: 24,
+    maxWidth: 280,
+    backgroundColor: '#0a0a0a',
+    borderRadius: 12,
+    padding: 20,
     borderWidth: 1,
     borderColor: '#1a1a1a',
   },
   formTitle: {
-    fontSize: 20,
+    fontSize: 18,
     fontWeight: '700',
     color: '#fff',
-    marginBottom: 20,
+    marginBottom: 16,
   },
-  inputGroup: {
-    marginBottom: 14,
-  },
-  inputLabel: {
-    fontSize: 10,
+  label: {
+    fontSize: 9,
     fontWeight: '600',
     color: '#555',
-    marginBottom: 6,
+    marginBottom: 4,
+    marginTop: 8,
   },
   input: {
     backgroundColor: '#111',
-    borderRadius: 8,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    borderRadius: 6,
+    paddingHorizontal: 10,
+    paddingVertical: 8,
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     borderWidth: 1,
     borderColor: '#222',
+    marginBottom: 8,
   },
   passwordRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginBottom: 8,
   },
   eyeBtn: {
-    padding: 10,
+    padding: 8,
   },
   submitBtn: {
     backgroundColor: '#8B5CF6',
-    borderRadius: 8,
-    paddingVertical: 12,
+    borderRadius: 6,
+    paddingVertical: 10,
     alignItems: 'center',
     marginTop: 8,
   },
   submitText: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
   switchText: {
     color: '#8B5CF6',
-    fontSize: 12,
+    fontSize: 11,
     textAlign: 'center',
-    marginTop: 16,
+    marginTop: 12,
   },
 });
