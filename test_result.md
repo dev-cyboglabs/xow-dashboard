@@ -159,24 +159,53 @@ backend:
     file: "/app/backend/server.py"
     stuck_count: 0
     priority: "high"
-    needs_retesting: false
+    needs_retesting: true
     status_history:
       - working: true
         agent: "testing"
         comment: "Dashboard insights, recordings, and visitors endpoints working correctly. Returns accurate counts, statistics, and filtered data."
+      - working: "NA"
+        agent: "main"
+        comment: "Added conversation detection and AI processing pipeline. Need to retest dashboard endpoints."
+
+  - task: "AI Processing Pipeline"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Implemented transcription, translation, summarization, and conversation detection using Emergent LLM Key with OpenAI API."
+
+  - task: "Audio/Video Streaming"
+    implemented: true
+    working: "NA"
+    file: "/app/backend/server.py"
+    stuck_count: 0
+    priority: "high"
+    needs_retesting: true
+    status_history:
+      - working: "NA"
+        agent: "main"
+        comment: "Added audio streaming endpoint and recording status check endpoint."
 
 frontend:
   # No frontend testing performed - backend only
 
 metadata:
-  created_by: "testing_agent"
-  version: "1.0"
-  test_sequence: 1
+  created_by: "main_agent"
+  version: "1.1"
+  test_sequence: 2
   run_ui: false
 
 test_plan:
   current_focus:
-    - "Full Backend API Workflow Test"
+    - "AI Processing Pipeline"
+    - "Audio/Video Streaming"
+    - "Dashboard Analytics"
   stuck_tasks: []
   test_all: false
   test_priority: "high_first"
@@ -184,3 +213,5 @@ test_plan:
 agent_communication:
   - agent: "testing"
     message: "Completed comprehensive backend API testing. All 17 test cases passed (100% success rate). Tested full workflow: device registration → login → create recording → add barcode scans → complete recording → dashboard verification. All endpoints responding correctly with proper data validation and error handling."
+  - agent: "main"
+    message: "Implemented full AI processing pipeline with conversation detection and segmentation. Added transcription (Whisper), translation (GPT), and summarization. Dashboard now shows conversation blocks with timestamps. Need backend testing to verify new endpoints."
