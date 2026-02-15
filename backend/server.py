@@ -135,12 +135,17 @@ def serialize_doc(doc):
 
 async def transcribe_audio(audio_data: bytes) -> str:
     """Transcribe audio using OpenAI Whisper"""
+    # Check if Whisper client is available
+    if not whisper_client:
+        logger.warning("Whisper API not configured - OPENAI_API_KEY not set. Audio transcription unavailable.")
+        return ""
+    
     try:
         # Create a temporary file-like object
         audio_file = io.BytesIO(audio_data)
         audio_file.name = "audio.webm"
         
-        response = openai_client.audio.transcriptions.create(
+        response = whisper_client.audio.transcriptions.create(
             model="whisper-1",
             file=audio_file,
             response_format="text"
