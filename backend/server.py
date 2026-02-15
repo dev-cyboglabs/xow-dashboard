@@ -876,7 +876,6 @@ async def get_audio(recording_id: str):
         
         # Read first 32 bytes to detect actual format
         header = await grid_out.read(32)
-        await grid_out.seek(0)  # Reset to beginning
         
         # Detect content type from file signature (magic bytes)
         content_type = "audio/mp4"  # Default for mobile recordings
@@ -893,10 +892,10 @@ async def get_audio(recording_id: str):
             # MP4/M4A format
             content_type = "audio/mp4"
         
+        # Close and reopen to start from beginning
+        grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
+        
         async def stream_audio():
-            # Yield the header we already read
-            yield header
-            # Then stream the rest
             while True:
                 chunk = await grid_out.read(1024 * 1024)  # 1MB chunks
                 if not chunk:
