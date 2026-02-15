@@ -147,10 +147,6 @@ export default function MainScreen() {
         const uri = audioRecording.current.getURI();
         
         if (uri) {
-          const audioData = await FileSystem.readAsStringAsync(uri, {
-            encoding: FileSystem.EncodingType.Base64,
-          });
-          
           const formData = new FormData();
           formData.append('audio', {
             uri: uri,
@@ -165,11 +161,7 @@ export default function MainScreen() {
               { headers: { 'Content-Type': 'multipart/form-data' } }
             );
           } catch (uploadError) {
-            console.log('Audio upload failed, saving locally');
-            await AsyncStorage.setItem(
-              `pending_audio_${currentRecording.id}`,
-              audioData
-            );
+            console.log('Audio upload failed, will retry later');
           }
         }
         audioRecording.current = null;
