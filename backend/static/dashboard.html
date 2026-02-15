@@ -538,53 +538,6 @@
             document.getElementById('modal').classList.remove('flex');
             currentRecordingId = null;
         }
-            } else {
-                transcriptSection.classList.add('hidden');
-            }
-            
-            document.getElementById('modal').classList.remove('hidden');
-            document.getElementById('modal').classList.add('flex');
-            
-            v.onloadeddata = () => {
-                v.currentTime = time;
-                v.play();
-            };
-        }
-
-        function seekTo(time) {
-            const v = document.getElementById('video');
-            v.currentTime = time;
-            v.play();
-        }
-
-        async function translateTranscript() {
-            if (!currentRecordingId || currentLang === 'en') return;
-            
-            const btn = document.getElementById('translate-btn');
-            const origText = btn.textContent;
-            btn.textContent = 'Translating...';
-            
-            try {
-                const response = await fetch(`${API}/recordings/${currentRecordingId}/translate?target_language=${currentLang}`, {
-                    method: 'POST'
-                });
-                const result = await response.json();
-                if (result.translated_transcript) {
-                    document.getElementById('transcript-text').textContent = result.translated_transcript;
-                    btn.textContent = 'Translated';
-                }
-            } catch (e) {
-                console.error(e);
-                btn.textContent = 'Error';
-            }
-        }
-
-        function closeModal() {
-            document.getElementById('video').pause();
-            document.getElementById('modal').classList.add('hidden');
-            document.getElementById('modal').classList.remove('flex');
-            currentRecordingId = null;
-        }
 
         function fmtDate(d) {
             return new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
