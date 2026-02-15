@@ -11,7 +11,6 @@ import {
   Alert,
   Dimensions,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -101,10 +100,7 @@ export default function LoginScreen() {
   };
 
   return (
-    <LinearGradient
-      colors={['#0a0a0f', '#1a1a2e', '#16213e']}
-      style={styles.container}
-    >
+    <View style={styles.container}>
       <KeyboardAvoidingView
         behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
         style={styles.content}
@@ -112,63 +108,68 @@ export default function LoginScreen() {
         {/* Logo and Title */}
         <View style={styles.header}>
           <View style={styles.logoContainer}>
-            <LinearGradient
-              colors={['#e94560', '#ff6b6b']}
-              style={styles.logoGradient}
-            >
-              <Ionicons name="videocam" size={40} color="#fff" />
-            </LinearGradient>
+            <Ionicons name="videocam" size={32} color="#fff" />
           </View>
           <Text style={styles.title}>XoW</Text>
-          <Text style={styles.subtitle}>Expo Recording System</Text>
+          <Text style={styles.subtitle}>Booth Recording System</Text>
         </View>
 
         {/* Login Form */}
         <View style={styles.formContainer}>
+          <Text style={styles.formTitle}>
+            {isRegistering ? 'Register Device' : 'Sign In'}
+          </Text>
+          
           <View style={styles.inputContainer}>
-            <Ionicons name="tablet-portrait-outline" size={22} color="#e94560" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Device ID"
-              placeholderTextColor="#666"
-              value={deviceId}
-              onChangeText={setDeviceId}
-              autoCapitalize="none"
-            />
+            <Text style={styles.inputLabel}>Device ID</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter device ID"
+                placeholderTextColor="#666"
+                value={deviceId}
+                onChangeText={setDeviceId}
+                autoCapitalize="none"
+              />
+            </View>
           </View>
 
           <View style={styles.inputContainer}>
-            <Ionicons name="lock-closed-outline" size={22} color="#e94560" style={styles.inputIcon} />
-            <TextInput
-              style={styles.input}
-              placeholder="Password"
-              placeholderTextColor="#666"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-            />
-            <TouchableOpacity
-              onPress={() => setShowPassword(!showPassword)}
-              style={styles.eyeIcon}
-            >
-              <Ionicons
-                name={showPassword ? 'eye-outline' : 'eye-off-outline'}
-                size={22}
-                color="#666"
+            <Text style={styles.inputLabel}>Password</Text>
+            <View style={styles.inputWrapper}>
+              <TextInput
+                style={styles.input}
+                placeholder="Enter password"
+                placeholderTextColor="#666"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
               />
-            </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => setShowPassword(!showPassword)}
+                style={styles.eyeIcon}
+              >
+                <Ionicons
+                  name={showPassword ? 'eye-outline' : 'eye-off-outline'}
+                  size={20}
+                  color="#666"
+                />
+              </TouchableOpacity>
+            </View>
           </View>
 
           {isRegistering && (
             <View style={styles.inputContainer}>
-              <Ionicons name="text-outline" size={22} color="#e94560" style={styles.inputIcon} />
-              <TextInput
-                style={styles.input}
-                placeholder="Device Name (e.g., Booth-A1)"
-                placeholderTextColor="#666"
-                value={deviceName}
-                onChangeText={setDeviceName}
-              />
+              <Text style={styles.inputLabel}>Booth Name</Text>
+              <View style={styles.inputWrapper}>
+                <TextInput
+                  style={styles.input}
+                  placeholder="e.g., Tech Expo - Booth A1"
+                  placeholderTextColor="#666"
+                  value={deviceName}
+                  onChangeText={setDeviceName}
+                />
+              </View>
             </View>
           )}
 
@@ -176,28 +177,15 @@ export default function LoginScreen() {
             style={styles.loginButton}
             onPress={isRegistering ? handleRegister : handleLogin}
             disabled={isLoading}
+            activeOpacity={0.8}
           >
-            <LinearGradient
-              colors={['#e94560', '#ff6b6b']}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 0 }}
-              style={styles.buttonGradient}
-            >
-              {isLoading ? (
-                <ActivityIndicator color="#fff" />
-              ) : (
-                <>
-                  <Ionicons
-                    name={isRegistering ? 'person-add-outline' : 'log-in-outline'}
-                    size={22}
-                    color="#fff"
-                  />
-                  <Text style={styles.buttonText}>
-                    {isRegistering ? 'Register Device' : 'Login'}
-                  </Text>
-                </>
-              )}
-            </LinearGradient>
+            {isLoading ? (
+              <ActivityIndicator color="#000" />
+            ) : (
+              <Text style={styles.buttonText}>
+                {isRegistering ? 'Register' : 'Sign In'}
+              </Text>
+            )}
           </TouchableOpacity>
 
           <TouchableOpacity
@@ -209,148 +197,131 @@ export default function LoginScreen() {
           >
             <Text style={styles.switchText}>
               {isRegistering
-                ? 'Already registered? Login'
-                : 'New device? Register here'}
+                ? 'Already registered? Sign In'
+                : 'New device? Register'}
             </Text>
-          </TouchableOpacity>
-
-          {/* Dashboard Link for Web */}
-          <TouchableOpacity
-            style={styles.dashboardLink}
-            onPress={() => router.push('/dashboard')}
-          >
-            <Ionicons name="analytics-outline" size={18} color="#e94560" />
-            <Text style={styles.dashboardLinkText}>Open Dashboard</Text>
           </TouchableOpacity>
         </View>
 
         {/* Footer */}
         <View style={styles.footer}>
-          <Text style={styles.footerText}>Secure Expo Recording Platform</Text>
+          <View style={styles.footerLine} />
+          <Text style={styles.footerText}>Secure Recording Platform</Text>
         </View>
       </KeyboardAvoidingView>
-    </LinearGradient>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+    backgroundColor: '#000',
   },
   content: {
     flex: 1,
     justifyContent: 'center',
-    paddingHorizontal: 30,
+    paddingHorizontal: 24,
   },
   header: {
     alignItems: 'center',
-    marginBottom: 50,
+    marginBottom: 48,
   },
   logoContainer: {
-    marginBottom: 20,
-  },
-  logoGradient: {
-    width: 80,
-    height: 80,
-    borderRadius: 20,
+    width: 64,
+    height: 64,
+    borderRadius: 16,
+    backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#e94560',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.5,
-    shadowRadius: 10,
-    elevation: 10,
+    marginBottom: 16,
   },
   title: {
-    fontSize: 48,
-    fontWeight: 'bold',
+    fontSize: 36,
+    fontWeight: '700',
     color: '#fff',
-    letterSpacing: 4,
+    letterSpacing: 2,
   },
   subtitle: {
     fontSize: 14,
-    color: '#888',
-    marginTop: 5,
-    letterSpacing: 2,
+    color: '#6B7280',
+    marginTop: 4,
   },
   formContainer: {
     width: '100%',
     maxWidth: 400,
     alignSelf: 'center',
   },
+  formTitle: {
+    fontSize: 24,
+    fontWeight: '600',
+    color: '#fff',
+    marginBottom: 24,
+  },
   inputContainer: {
+    marginBottom: 20,
+  },
+  inputLabel: {
+    fontSize: 14,
+    color: '#9CA3AF',
+    marginBottom: 8,
+    fontWeight: '500',
+  },
+  inputWrapper: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.08)',
+    backgroundColor: '#1F1F1F',
     borderRadius: 12,
-    marginBottom: 16,
     borderWidth: 1,
-    borderColor: 'rgba(233,69,96,0.3)',
-  },
-  inputIcon: {
-    paddingLeft: 15,
+    borderColor: '#2D2D2D',
   },
   input: {
     flex: 1,
     paddingVertical: 16,
-    paddingHorizontal: 12,
+    paddingHorizontal: 16,
     fontSize: 16,
     color: '#fff',
   },
   eyeIcon: {
-    paddingRight: 15,
+    paddingRight: 16,
   },
   loginButton: {
-    marginTop: 10,
+    backgroundColor: '#fff',
     borderRadius: 12,
-    overflow: 'hidden',
-    shadowColor: '#e94560',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.4,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  buttonGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
     paddingVertical: 16,
-    gap: 10,
+    alignItems: 'center',
+    marginTop: 8,
   },
   buttonText: {
-    color: '#fff',
-    fontSize: 18,
+    color: '#000',
+    fontSize: 16,
     fontWeight: '600',
   },
   switchButton: {
-    marginTop: 20,
+    marginTop: 24,
     alignItems: 'center',
   },
   switchText: {
-    color: '#e94560',
+    color: '#7C3AED',
     fontSize: 14,
-  },
-  dashboardLink: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginTop: 30,
-    gap: 8,
-    paddingVertical: 10,
-  },
-  dashboardLinkText: {
-    color: '#e94560',
-    fontSize: 14,
+    fontWeight: '500',
   },
   footer: {
     position: 'absolute',
-    bottom: 30,
-    left: 0,
-    right: 0,
+    bottom: 40,
+    left: 24,
+    right: 24,
     alignItems: 'center',
   },
+  footerLine: {
+    width: 40,
+    height: 4,
+    backgroundColor: '#2D2D2D',
+    borderRadius: 2,
+    marginBottom: 12,
+  },
   footerText: {
-    color: '#444',
+    color: '#4B5563',
     fontSize: 12,
   },
 });

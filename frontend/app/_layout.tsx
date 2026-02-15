@@ -10,14 +10,13 @@ export default function RootLayout() {
       <Stack
         screenOptions={{
           headerShown: false,
-          contentStyle: { backgroundColor: '#0a0a0f' },
+          contentStyle: { backgroundColor: '#000000' },
           animation: 'fade',
         }}
       >
         <Stack.Screen name="index" />
         <Stack.Screen name="main" />
         <Stack.Screen name="gallery" />
-        <Stack.Screen name="dashboard" />
       </Stack>
     </View>
   );
@@ -26,6 +25,6 @@ export default function RootLayout() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#000000',
   },
 });

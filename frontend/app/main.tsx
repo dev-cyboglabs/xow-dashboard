@@ -10,12 +10,11 @@ import {
   Platform,
   ScrollView,
 } from 'react-native';
-import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions, CameraCapturedPicture } from 'expo-camera';
-import { Audio, Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { CameraView, useCameraPermissions } from 'expo-camera';
+import { Audio } from 'expo-av';
 import * as FileSystem from 'expo-file-system';
 import axios from 'axios';
 
@@ -107,7 +106,6 @@ export default function MainScreen() {
     if (!device) return;
 
     try {
-      // Create recording in backend
       const response = await axios.post(`${API_URL}/api/recordings`, {
         device_id: device.device_id,
         expo_name: 'Expo 2025',
@@ -118,12 +116,10 @@ export default function MainScreen() {
       setIsRecording(true);
       recordingStartTime.current = Date.now();
 
-      // Start timer
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
 
-      // Start audio recording
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await recording.startAsync();
@@ -146,13 +142,11 @@ export default function MainScreen() {
         timerRef.current = null;
       }
 
-      // Stop audio recording
       if (audioRecording.current) {
         await audioRecording.current.stopAndUnloadAsync();
         const uri = audioRecording.current.getURI();
         
         if (uri) {
-          // Upload audio
           const audioData = await FileSystem.readAsStringAsync(uri, {
             encoding: FileSystem.EncodingType.Base64,
           });
@@ -181,7 +175,6 @@ export default function MainScreen() {
         audioRecording.current = null;
       }
 
-      // Complete recording
       await axios.put(`${API_URL}/api/recordings/${currentRecording.id}/complete`);
 
       setCurrentRecording(null);
@@ -212,7 +205,6 @@ export default function MainScreen() {
       setBarcodeInput('');
     } catch (error) {
       console.error('Barcode scan error:', error);
-      // Save locally if offline
       await AsyncStorage.setItem(
         `pending_barcode_${Date.now()}`,
         JSON.stringify({
@@ -227,10 +219,10 @@ export default function MainScreen() {
   };
 
   const handleLogout = async () => {
-    Alert.alert('Logout', 'Are you sure you want to logout?', [
+    Alert.alert('Sign Out', 'Are you sure you want to sign out?', [
       { text: 'Cancel', style: 'cancel' },
       {
-        text: 'Logout',
+        text: 'Sign Out',
         style: 'destructive',
         onPress: async () => {
           await AsyncStorage.removeItem('xow_device');
@@ -254,15 +246,18 @@ export default function MainScreen() {
 
   if (!cameraPermission?.granted) {
     return (
-      <LinearGradient colors={['#0a0a0f', '#1a1a2e', '#16213e']} style={styles.container}>
+      <View style={styles.container}>
         <View style={styles.permissionContainer}>
-          <Ionicons name="camera-outline" size={60} color="#e94560" />
-          <Text style={styles.permissionText}>Camera permission required</Text>
+          <View style={styles.permissionIcon}>
+            <Ionicons name="camera-outline" size={48} color="#7C3AED" />
+          </View>
+          <Text style={styles.permissionTitle}>Camera Access Required</Text>
+          <Text style={styles.permissionText}>XoW needs camera access to record booth activity</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestCameraPermission}>
-            <Text style={styles.permissionButtonText}>Grant Permission</Text>
+            <Text style={styles.permissionButtonText}>Enable Camera</Text>
           </TouchableOpacity>
         </View>
-      </LinearGradient>
+      </View>
     );
   }
 
@@ -270,103 +265,106 @@ export default function MainScreen() {
     <View style={styles.container}>
       {/* Camera Preview */}
       <CameraView ref={cameraRef} style={styles.camera} facing="back">
-        {/* Overlay */}
-        <LinearGradient
-          colors={['rgba(0,0,0,0.7)', 'transparent', 'transparent', 'rgba(0,0,0,0.7)']}
-          style={styles.overlay}
-        >
-          {/* Top Bar */}
-          <View style={styles.topBar}>
-            <View style={styles.deviceInfo}>
-              <Ionicons name="tablet-portrait" size={18} color="#fff" />
-              <Text style={styles.deviceName}>{device?.name || 'Device'}</Text>
+        {/* Top Header */}
+        <View style={styles.topHeader}>
+          <View style={styles.deviceBadge}>
+            <View style={styles.deviceIcon}>
+              <Ionicons name="business" size={14} color="#fff" />
             </View>
-            
-            {/* Connection Status */}
-            <View style={[styles.statusBadge, { backgroundColor: isOnline ? '#00c853' : '#ff5252' }]}>
-              <View style={[styles.statusDot, { backgroundColor: isOnline ? '#00e676' : '#ff8a80' }]} />
-              <Text style={styles.statusText}>{isOnline ? 'ONLINE' : 'OFFLINE'}</Text>
-            </View>
+            <Text style={styles.deviceName} numberOfLines={1}>{device?.name || 'Device'}</Text>
           </View>
+          
+          <View style={[styles.connectionStatus, isOnline ? styles.online : styles.offline]}>
+            <View style={[styles.connectionDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+            <Text style={styles.connectionText}>{isOnline ? 'Connected' : 'Offline'}</Text>
+          </View>
+        </View>
 
-          {/* Timestamp Overlay */}
+        {/* Recording Indicator */}
+        {isRecording && (
+          <View style={styles.recordingBadge}>
+            <View style={styles.recordingDot} />
+            <Text style={styles.recordingTime}>{formatTime(recordingTime)}</Text>
+          </View>
+        )}
+
+        {/* Timestamp Overlay */}
+        {isRecording && (
+          <View style={styles.timestampContainer}>
+            <Text style={styles.timestampText}>{getCurrentDateTime()}</Text>
+          </View>
+        )}
+
+        {/* Bottom Controls */}
+        <View style={styles.bottomArea}>
+          {/* Barcode Input */}
           {isRecording && (
-            <View style={styles.timestampOverlay}>
-              <Text style={styles.timestampText}>{getCurrentDateTime()}</Text>
-              <Text style={styles.frameText}>REC {formatTime(recordingTime)}</Text>
+            <View style={styles.barcodeSection}>
+              <View style={styles.barcodeInput}>
+                <Ionicons name="scan-outline" size={20} color="#7C3AED" />
+                <TextInput
+                  style={styles.barcodeTextInput}
+                  placeholder="Scan visitor badge..."
+                  placeholderTextColor="#6B7280"
+                  value={barcodeInput}
+                  onChangeText={setBarcodeInput}
+                  onSubmitEditing={handleBarcodeSubmit}
+                  autoCapitalize="characters"
+                />
+                <TouchableOpacity onPress={handleBarcodeSubmit} style={styles.addButton}>
+                  <Ionicons name="add" size={20} color="#fff" />
+                </TouchableOpacity>
+              </View>
+              
+              {recentScans.length > 0 && (
+                <ScrollView horizontal style={styles.recentScans} showsHorizontalScrollIndicator={false}>
+                  {recentScans.map((scan, index) => (
+                    <View key={index} style={styles.scanChip}>
+                      <Ionicons name="person" size={12} color="#7C3AED" />
+                      <Text style={styles.scanChipText}>{scan}</Text>
+                    </View>
+                  ))}
+                </ScrollView>
+              )}
             </View>
           )}
 
-          {/* Bottom Controls */}
-          <View style={styles.bottomControls}>
-            {/* Navigation Buttons */}
-            <View style={styles.navButtons}>
-              <TouchableOpacity style={styles.navButton} onPress={() => router.push('/gallery')}>
-                <Ionicons name="images-outline" size={24} color="#fff" />
-                <Text style={styles.navButtonText}>Gallery</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.navButton} onPress={() => router.push('/dashboard')}>
-                <Ionicons name="analytics-outline" size={24} color="#fff" />
-                <Text style={styles.navButtonText}>Dashboard</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.navButton} onPress={handleLogout}>
-                <Ionicons name="log-out-outline" size={24} color="#ff5252" />
-                <Text style={[styles.navButtonText, { color: '#ff5252' }]}>Logout</Text>
-              </TouchableOpacity>
-            </View>
-
-            {/* Barcode Input */}
-            {isRecording && (
-              <View style={styles.barcodeSection}>
-                <View style={styles.barcodeInputContainer}>
-                  <Ionicons name="barcode-outline" size={20} color="#e94560" />
-                  <TextInput
-                    style={styles.barcodeInput}
-                    placeholder="Scan or enter barcode..."
-                    placeholderTextColor="#666"
-                    value={barcodeInput}
-                    onChangeText={setBarcodeInput}
-                    onSubmitEditing={handleBarcodeSubmit}
-                    autoCapitalize="characters"
-                  />
-                  <TouchableOpacity onPress={handleBarcodeSubmit}>
-                    <Ionicons name="add-circle" size={28} color="#e94560" />
-                  </TouchableOpacity>
-                </View>
-                
-                {recentScans.length > 0 && (
-                  <ScrollView horizontal style={styles.recentScans} showsHorizontalScrollIndicator={false}>
-                    {recentScans.map((scan, index) => (
-                      <View key={index} style={styles.scanBadge}>
-                        <Text style={styles.scanBadgeText}>{scan}</Text>
-                      </View>
-                    ))}
-                  </ScrollView>
-                )}
+          {/* Action Buttons */}
+          <View style={styles.actionBar}>
+            <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/gallery')}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="grid-outline" size={22} color="#fff" />
               </View>
-            )}
+              <Text style={styles.actionText}>Gallery</Text>
+            </TouchableOpacity>
 
             {/* Record Button */}
             <TouchableOpacity
-              style={[styles.recordButton, isRecording && styles.recordingButton]}
+              style={styles.recordButtonOuter}
               onPress={isRecording ? stopRecording : startRecording}
+              activeOpacity={0.8}
             >
-              <View style={[styles.recordButtonInner, isRecording && styles.recordingButtonInner]}>
+              <View style={[styles.recordButtonInner, isRecording && styles.recordingActive]}>
                 {isRecording ? (
-                  <Ionicons name="stop" size={40} color="#fff" />
+                  <View style={styles.stopIcon} />
                 ) : (
-                  <View style={styles.recordDot} />
+                  <View style={styles.recordIcon} />
                 )}
               </View>
             </TouchableOpacity>
-            
-            <Text style={styles.recordLabel}>
-              {isRecording ? 'Tap to Stop Recording' : 'Tap to Start Recording'}
-            </Text>
+
+            <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
+              <View style={styles.actionIcon}>
+                <Ionicons name="log-out-outline" size={22} color="#fff" />
+              </View>
+              <Text style={styles.actionText}>Sign Out</Text>
+            </TouchableOpacity>
           </View>
-        </LinearGradient>
+
+          <Text style={styles.recordHint}>
+            {isRecording ? 'Tap to stop recording' : 'Tap to start recording'}
+          </Text>
+        </View>
       </CameraView>
     </View>
   );
@@ -375,188 +373,260 @@ export default function MainScreen() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#0a0a0f',
+    backgroundColor: '#000',
   },
   camera: {
     flex: 1,
   },
-  overlay: {
-    flex: 1,
-    justifyContent: 'space-between',
-  },
-  topBar: {
+  topHeader: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: 20,
+    paddingHorizontal: 16,
     paddingTop: Platform.OS === 'ios' ? 60 : 40,
   },
-  deviceInfo: {
+  deviceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
-    paddingHorizontal: 12,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    gap: 8,
+    maxWidth: 180,
+  },
+  deviceIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
+    backgroundColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginRight: 8,
   },
   deviceName: {
     color: '#fff',
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: '600',
   },
-  statusBadge: {
+  connectionStatus: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: 12,
     paddingVertical: 8,
+    paddingHorizontal: 12,
     borderRadius: 20,
-    gap: 6,
   },
-  statusDot: {
+  online: {
+    backgroundColor: 'rgba(16, 185, 129, 0.2)',
+  },
+  offline: {
+    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  },
+  connectionDot: {
     width: 8,
     height: 8,
     borderRadius: 4,
+    marginRight: 6,
   },
-  statusText: {
+  onlineDot: {
+    backgroundColor: '#10B981',
+  },
+  offlineDot: {
+    backgroundColor: '#EF4444',
+  },
+  connectionText: {
     color: '#fff',
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: '600',
   },
-  timestampOverlay: {
+  recordingBadge: {
     position: 'absolute',
     top: Platform.OS === 'ios' ? 110 : 90,
-    left: 20,
-    backgroundColor: 'rgba(233,69,96,0.8)',
-    paddingHorizontal: 12,
+    left: 16,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(124, 58, 237, 0.9)',
+    paddingVertical: 8,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  recordingDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+    marginRight: 8,
+  },
+  recordingTime: {
+    color: '#fff',
+    fontSize: 14,
+    fontWeight: '700',
+    fontVariant: ['tabular-nums'],
+  },
+  timestampContainer: {
+    position: 'absolute',
+    top: Platform.OS === 'ios' ? 110 : 90,
+    right: 16,
+    backgroundColor: 'rgba(0,0,0,0.6)',
     paddingVertical: 6,
+    paddingHorizontal: 10,
     borderRadius: 8,
   },
   timestampText: {
     color: '#fff',
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: '500',
   },
-  frameText: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: 'bold',
-    marginTop: 2,
-  },
-  bottomControls: {
-    paddingHorizontal: 20,
-    paddingBottom: Platform.OS === 'ios' ? 40 : 20,
-    alignItems: 'center',
-  },
-  navButtons: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    gap: 30,
-    marginBottom: 20,
-  },
-  navButton: {
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.5)',
+  bottomArea: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    paddingBottom: Platform.OS === 'ios' ? 40 : 24,
     paddingHorizontal: 16,
-    paddingVertical: 10,
-    borderRadius: 12,
-  },
-  navButtonText: {
-    color: '#fff',
-    fontSize: 12,
-    marginTop: 4,
   },
   barcodeSection: {
-    width: '100%',
     marginBottom: 20,
   },
-  barcodeInputContainer: {
+  barcodeInput: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255,255,255,0.1)',
+    backgroundColor: 'rgba(31, 31, 31, 0.95)',
     borderRadius: 12,
-    paddingHorizontal: 12,
+    paddingLeft: 14,
     borderWidth: 1,
-    borderColor: 'rgba(233,69,96,0.5)',
+    borderColor: 'rgba(124, 58, 237, 0.3)',
   },
-  barcodeInput: {
+  barcodeTextInput: {
     flex: 1,
-    paddingVertical: 12,
+    paddingVertical: 14,
     paddingHorizontal: 10,
     color: '#fff',
-    fontSize: 16,
+    fontSize: 15,
+  },
+  addButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 10,
+    backgroundColor: '#7C3AED',
+    justifyContent: 'center',
+    alignItems: 'center',
+    margin: 4,
   },
   recentScans: {
     marginTop: 10,
   },
-  scanBadge: {
-    backgroundColor: 'rgba(233,69,96,0.3)',
+  scanChip: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(124, 58, 237, 0.2)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 16,
     marginRight: 8,
+    borderWidth: 1,
+    borderColor: 'rgba(124, 58, 237, 0.3)',
   },
-  scanBadgeText: {
+  scanChipText: {
     color: '#fff',
     fontSize: 12,
+    marginLeft: 6,
+    fontWeight: '500',
   },
-  recordButton: {
+  actionBar: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 12,
+  },
+  actionButton: {
+    alignItems: 'center',
+    paddingHorizontal: 20,
+  },
+  actionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: 'rgba(255,255,255,0.15)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  actionText: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '500',
+  },
+  recordButtonOuter: {
     width: 80,
     height: 80,
     borderRadius: 40,
-    backgroundColor: 'rgba(255,255,255,0.3)',
+    backgroundColor: 'rgba(255,255,255,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 4,
+    marginHorizontal: 24,
+    borderWidth: 3,
     borderColor: '#fff',
   },
-  recordingButton: {
-    backgroundColor: 'rgba(255,82,82,0.3)',
-    borderColor: '#ff5252',
-  },
   recordButtonInner: {
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: '#e94560',
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#7C3AED',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recordingButtonInner: {
-    backgroundColor: '#ff5252',
-    borderRadius: 8,
-    width: 40,
-    height: 40,
+  recordingActive: {
+    backgroundColor: '#EF4444',
   },
-  recordDot: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+  recordIcon: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
     backgroundColor: '#fff',
   },
-  recordLabel: {
-    color: '#fff',
-    fontSize: 14,
-    marginTop: 12,
+  stopIcon: {
+    width: 24,
+    height: 24,
+    borderRadius: 4,
+    backgroundColor: '#fff',
+  },
+  recordHint: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 13,
     textAlign: 'center',
   },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 30,
+    padding: 40,
+  },
+  permissionIcon: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(124, 58, 237, 0.1)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 24,
+  },
+  permissionTitle: {
+    color: '#fff',
+    fontSize: 22,
+    fontWeight: '600',
+    marginBottom: 12,
   },
   permissionText: {
-    color: '#fff',
-    fontSize: 18,
-    marginTop: 20,
-    marginBottom: 30,
+    color: '#6B7280',
+    fontSize: 15,
     textAlign: 'center',
+    marginBottom: 32,
+    lineHeight: 22,
   },
   permissionButton: {
-    backgroundColor: '#e94560',
-    paddingHorizontal: 30,
-    paddingVertical: 15,
+    backgroundColor: '#7C3AED',
+    paddingHorizontal: 32,
+    paddingVertical: 14,
     borderRadius: 12,
   },
   permissionButtonText: {
