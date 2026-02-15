@@ -175,9 +175,13 @@ Using OpenAI Whisper + GPT-4o for accurate speaker separation:
 ### P0 - Critical
 (None - all core features completed)
 
+### P1 - High Priority
+1. **Barcode Scanner Integration**: Implement actual barcode scanning with expo-barcode-scanner
+2. **Offline Recording**: Store recordings locally when offline, sync when connection restored
+
 ### P2 - Medium Priority
-1. **Barcode Scanner Integration**: Implement barcode scanning in mobile app
-2. **Real-time Recording Status**: WebSocket updates for recording status
+1. **Real-time Recording Status**: WebSocket updates for recording status
+2. **Multi-language Translation**: Batch translate all conversations
 
 ### P3 - Low Priority
 1. **Code Refactoring**: Break down `frontend/app/index.tsx` into smaller components
