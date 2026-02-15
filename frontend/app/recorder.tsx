@@ -16,7 +16,7 @@ import { CameraView, useCameraPermissions } from 'expo-camera';
 import { Audio } from 'expo-av';
 import axios from 'axios';
 
-const { width, height } = Dimensions.get('window');
+const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
 interface Device {
@@ -44,6 +44,7 @@ export default function RecorderScreen() {
   const [barcodeCount, setBarcodeCount] = useState(0);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [currentTime, setCurrentTime] = useState(new Date());
+  const [isUploading, setIsUploading] = useState(false);
   
   const cameraRef = useRef<CameraView>(null);
   const audioRecording = useRef<Audio.Recording | null>(null);
@@ -51,18 +52,18 @@ export default function RecorderScreen() {
   const frameTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clockRef = useRef<NodeJS.Timeout | null>(null);
   const recordingStartTime = useRef<number>(0);
+  const barcodeInputRef = useRef<TextInput>(null);
 
   useEffect(() => {
     loadDevice();
     checkPermissions();
     checkConnection();
     
-    // Update clock every second
     clockRef.current = setInterval(() => {
       setCurrentTime(new Date());
     }, 1000);
 
-    const connectionInterval = setInterval(checkConnection, 30000);
+    const connectionInterval = setInterval(checkConnection, 10000);
     
     return () => {
       clearInterval(connectionInterval);
@@ -89,7 +90,7 @@ export default function RecorderScreen() {
     if (!cameraPermission?.granted) {
       await requestCameraPermission();
     }
-    const audioStatus = await Audio.requestPermissionsAsync();
+    await Audio.requestPermissionsAsync();
     await Audio.setAudioModeAsync({
       allowsRecordingIOS: true,
       playsInSilentModeIOS: true,
@@ -115,9 +116,8 @@ export default function RecorderScreen() {
 
   const formatDate = (date: Date) => {
     return date.toLocaleDateString('en-US', {
-      weekday: 'short',
       year: 'numeric',
-      month: 'short',
+      month: '2-digit',
       day: '2-digit',
     });
   };
@@ -146,19 +146,17 @@ export default function RecorderScreen() {
       setFrameCount(0);
       setBarcodeCount(0);
       setLastBarcode(null);
+      setRecordingTime(0);
       recordingStartTime.current = Date.now();
 
-      // Timer for seconds
       timerRef.current = setInterval(() => {
         setRecordingTime((prev) => prev + 1);
       }, 1000);
 
-      // Frame counter (simulating 30fps)
       frameTimerRef.current = setInterval(() => {
         setFrameCount((prev) => prev + 1);
       }, 33.33);
 
-      // Start audio recording
       const recording = new Audio.Recording();
       await recording.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
       await recording.startAsync();
@@ -166,59 +164,87 @@ export default function RecorderScreen() {
 
     } catch (error) {
       console.error('Start recording error:', error);
-      Alert.alert('Error', 'Failed to start recording');
+      Alert.alert('Error', 'Failed to start recording. Check connection.');
     }
   };
 
   const stopRecording = async () => {
     if (!currentRecording) return;
 
+    setIsUploading(true);
     try {
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
       if (frameTimerRef.current) clearInterval(frameTimerRef.current);
 
+      let audioUri = null;
       if (audioRecording.current) {
         await audioRecording.current.stopAndUnloadAsync();
-        const uri = audioRecording.current.getURI();
-        
-        if (uri) {
-          const formData = new FormData();
-          formData.append('audio', {
-            uri: uri,
-            type: 'audio/m4a',
-            name: 'recording.m4a',
-          } as any);
-
-          try {
-            await axios.post(
-              `${API_URL}/api/recordings/${currentRecording.id}/upload-audio`,
-              formData,
-              { headers: { 'Content-Type': 'multipart/form-data' } }
-            );
-          } catch (uploadError) {
-            console.log('Audio upload pending');
-          }
-        }
+        audioUri = audioRecording.current.getURI();
         audioRecording.current = null;
       }
 
+      // Upload audio
+      if (audioUri) {
+        const formData = new FormData();
+        formData.append('audio', {
+          uri: audioUri,
+          type: 'audio/m4a',
+          name: 'recording.m4a',
+        } as any);
+
+        try {
+          await axios.post(
+            `${API_URL}/api/recordings/${currentRecording.id}/upload-audio`,
+            formData,
+            { 
+              headers: { 'Content-Type': 'multipart/form-data' },
+              timeout: 60000
+            }
+          );
+        } catch (uploadError) {
+          console.log('Audio upload failed, saving for later');
+          await AsyncStorage.setItem(
+            `pending_upload_${currentRecording.id}`,
+            JSON.stringify({ audioUri, recordingId: currentRecording.id })
+          );
+        }
+      }
+
+      // Complete recording
       await axios.put(`${API_URL}/api/recordings/${currentRecording.id}/complete`);
 
-      const savedCount = barcodeCount;
+      // Trigger transcription in background
+      try {
+        axios.post(`${API_URL}/api/recordings/${currentRecording.id}/transcribe`);
+      } catch (e) {
+        console.log('Transcription queued');
+      }
+
+      const duration = recordingTime;
+      const visitors = barcodeCount;
+      
       setCurrentRecording(null);
       setRecordingTime(0);
       setFrameCount(0);
+      setBarcodeCount(0);
+      setLastBarcode(null);
 
-      Alert.alert('Recording Saved', `Duration: ${formatTimecode(recordingTime)}\nVisitors logged: ${savedCount}`);
+      Alert.alert(
+        'Recording Complete',
+        `Duration: ${Math.floor(duration/60)}m ${duration%60}s\nVisitors: ${visitors}\nUploading to cloud...`,
+        [{ text: 'OK' }]
+      );
     } catch (error) {
       console.error('Stop recording error:', error);
-      Alert.alert('Error', 'Failed to stop recording');
+      Alert.alert('Error', 'Failed to save recording');
+    } finally {
+      setIsUploading(false);
     }
   };
 
   const handleBarcodeSubmit = async () => {
-    if (!barcodeInput.trim() || !currentRecording) return;
+    if (!barcodeInput.trim() || !currentRecording || !isRecording) return;
 
     const barcode = barcodeInput.trim();
     const videoTimestamp = (Date.now() - recordingStartTime.current) / 1000;
@@ -231,19 +257,30 @@ export default function RecorderScreen() {
         video_timestamp: videoTimestamp,
         frame_code: currentFrame,
       });
-
-      setLastBarcode(barcode);
-      setBarcodeCount((prev) => prev + 1);
-      setBarcodeInput('');
     } catch (error) {
-      // Save locally if offline
-      setLastBarcode(barcode);
-      setBarcodeCount((prev) => prev + 1);
-      setBarcodeInput('');
+      // Save offline
+      const pendingScans = await AsyncStorage.getItem('pending_scans') || '[]';
+      const scans = JSON.parse(pendingScans);
+      scans.push({
+        recording_id: currentRecording.id,
+        barcode_data: barcode,
+        video_timestamp: videoTimestamp,
+        frame_code: currentFrame,
+      });
+      await AsyncStorage.setItem('pending_scans', JSON.stringify(scans));
     }
+
+    setLastBarcode(barcode);
+    setBarcodeCount((prev) => prev + 1);
+    setBarcodeInput('');
+    barcodeInputRef.current?.focus();
   };
 
   const handleLogout = async () => {
+    if (isRecording) {
+      Alert.alert('Warning', 'Stop recording before signing out');
+      return;
+    }
     Alert.alert('Sign Out', 'Are you sure?', [
       { text: 'Cancel', style: 'cancel' },
       {
@@ -261,11 +298,11 @@ export default function RecorderScreen() {
     return (
       <View style={styles.container}>
         <View style={styles.permissionContainer}>
-          <Ionicons name="videocam-off" size={64} color="#7C3AED" />
-          <Text style={styles.permissionTitle}>Camera Access Required</Text>
-          <Text style={styles.permissionText}>Enable camera to start recording booth activity</Text>
+          <Ionicons name="videocam-off" size={48} color="#8B5CF6" />
+          <Text style={styles.permissionTitle}>Camera Required</Text>
+          <Text style={styles.permissionText}>Enable camera to record</Text>
           <TouchableOpacity style={styles.permissionButton} onPress={requestCameraPermission}>
-            <Text style={styles.permissionButtonText}>Enable Camera</Text>
+            <Text style={styles.permissionButtonText}>Enable</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -274,102 +311,76 @@ export default function RecorderScreen() {
 
   return (
     <View style={styles.container}>
-      {/* Camera View */}
-      <View style={styles.cameraContainer}>
-        <CameraView ref={cameraRef} style={styles.camera} facing="back" />
+      {/* Camera Area */}
+      <View style={styles.cameraArea}>
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" />
         
-        {/* Overlay Container */}
-        <View style={styles.overlay}>
-          {/* Top Bar */}
-          <View style={styles.topBar}>
-            {/* Left - Device Info */}
-            <View style={styles.deviceInfo}>
-              <View style={styles.deviceIdBadge}>
-                <Ionicons name="hardware-chip" size={14} color="#7C3AED" />
-                <Text style={styles.deviceIdText}>ID: {device?.device_id || '---'}</Text>
-              </View>
-              <Text style={styles.boothName}>{device?.name || 'Loading...'}</Text>
-            </View>
-
-            {/* Center - Recording Status */}
-            <View style={styles.recordingStatus}>
-              {isRecording && (
-                <View style={styles.recIndicator}>
-                  <View style={styles.recDot} />
-                  <Text style={styles.recText}>REC</Text>
-                </View>
-              )}
-            </View>
-
-            {/* Right - Connection Status */}
-            <View style={styles.connectionInfo}>
-              <View style={[styles.connectionBadge, isOnline ? styles.online : styles.offline]}>
-                <View style={[styles.connectionDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
-                <Text style={styles.connectionText}>{isOnline ? 'CLOUD CONNECTED' : 'OFFLINE'}</Text>
-              </View>
-            </View>
+        {/* Top Overlay */}
+        <View style={styles.topOverlay}>
+          <View style={styles.deviceBadge}>
+            <Ionicons name="hardware-chip" size={12} color="#8B5CF6" />
+            <Text style={styles.deviceId}>{device?.device_id || '---'}</Text>
           </View>
-
-          {/* Timecode Overlay - Top Left */}
-          <View style={styles.timecodeOverlay}>
-            <View style={styles.timecodeRow}>
-              <Text style={styles.timecodeLabel}>DATE</Text>
-              <Text style={styles.timecodeValue}>{formatDate(currentTime)}</Text>
-            </View>
-            <View style={styles.timecodeRow}>
-              <Text style={styles.timecodeLabel}>TIME</Text>
-              <Text style={styles.timecodeValue}>{formatTime(currentTime)}</Text>
-            </View>
-            {isRecording && (
-              <>
-                <View style={styles.timecodeDivider} />
-                <View style={styles.timecodeRow}>
-                  <Text style={styles.timecodeLabel}>TC</Text>
-                  <Text style={[styles.timecodeValue, styles.timecodeRec]}>{formatTimecode(recordingTime)}</Text>
-                </View>
-                <View style={styles.timecodeRow}>
-                  <Text style={styles.timecodeLabel}>FRAME</Text>
-                  <Text style={[styles.timecodeValue, styles.frameValue]}>{frameCount.toString().padStart(8, '0')}</Text>
-                </View>
-              </>
-            )}
-          </View>
-
-          {/* XoW Watermark - Bottom Right */}
-          <View style={styles.watermark}>
-            <View style={styles.watermarkLogo}>
-              <Ionicons name="videocam" size={16} color="rgba(124, 58, 237, 0.8)" />
-            </View>
-            <Text style={styles.watermarkText}>XoW</Text>
-          </View>
-
-          {/* Barcode Counter - Bottom Left */}
+          
           {isRecording && (
-            <View style={styles.barcodeStats}>
-              <Ionicons name="people" size={18} color="#7C3AED" />
-              <Text style={styles.barcodeCountText}>{barcodeCount}</Text>
-              <Text style={styles.barcodeCountLabel}>VISITORS</Text>
-              {lastBarcode && (
-                <View style={styles.lastBarcodeBadge}>
-                  <Text style={styles.lastBarcodeText}>Last: {lastBarcode}</Text>
-                </View>
-              )}
+            <View style={styles.recBadge}>
+              <View style={styles.recDot} />
+              <Text style={styles.recText}>REC</Text>
             </View>
           )}
+          
+          <View style={[styles.statusBadge, isOnline ? styles.online : styles.offline]}>
+            <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
+            <Text style={styles.statusText}>{isOnline ? 'ONLINE' : 'OFFLINE'}</Text>
+          </View>
         </View>
+
+        {/* Timecode Box */}
+        <View style={styles.timecodeBox}>
+          <Text style={styles.tcLabel}>DATE</Text>
+          <Text style={styles.tcValue}>{formatDate(currentTime)}</Text>
+          <Text style={styles.tcLabel}>TIME</Text>
+          <Text style={styles.tcValue}>{formatTime(currentTime)}</Text>
+          {isRecording && (
+            <>
+              <View style={styles.tcDivider} />
+              <Text style={styles.tcLabel}>TIMECODE</Text>
+              <Text style={[styles.tcValue, styles.tcRec]}>{formatTimecode(recordingTime)}</Text>
+              <Text style={styles.tcLabel}>FRAME</Text>
+              <Text style={[styles.tcValue, styles.tcFrame]}>{frameCount.toString().padStart(6, '0')}</Text>
+            </>
+          )}
+        </View>
+
+        {/* Watermark */}
+        <View style={styles.watermark}>
+          <Ionicons name="videocam" size={14} color="#8B5CF6" />
+          <Text style={styles.watermarkText}>XoW</Text>
+        </View>
+
+        {/* Visitor Count */}
+        {isRecording && (
+          <View style={styles.visitorBox}>
+            <Ionicons name="people" size={16} color="#8B5CF6" />
+            <Text style={styles.visitorCount}>{barcodeCount}</Text>
+            {lastBarcode && <Text style={styles.lastScan}>{lastBarcode}</Text>}
+          </View>
+        )}
       </View>
 
-      {/* Control Panel - Right Side */}
+      {/* Control Panel */}
       <View style={styles.controlPanel}>
+        <Text style={styles.boothName}>{device?.name || 'Booth'}</Text>
+        
         {/* Barcode Input */}
         <View style={styles.barcodeSection}>
-          <Text style={styles.sectionLabel}>VISITOR SCAN</Text>
-          <View style={styles.barcodeInputWrapper}>
-            <Ionicons name="barcode-outline" size={20} color="#7C3AED" />
+          <Text style={styles.sectionLabel}>SCAN VISITOR</Text>
+          <View style={styles.barcodeInputRow}>
             <TextInput
+              ref={barcodeInputRef}
               style={styles.barcodeInput}
-              placeholder={isRecording ? "Scan badge..." : "Start recording first"}
-              placeholderTextColor="#4B5563"
+              placeholder="Badge ID"
+              placeholderTextColor="#555"
               value={barcodeInput}
               onChangeText={setBarcodeInput}
               onSubmitEditing={handleBarcodeSubmit}
@@ -377,45 +388,44 @@ export default function RecorderScreen() {
               editable={isRecording}
             />
             <TouchableOpacity
-              style={[styles.scanButton, !isRecording && styles.scanButtonDisabled]}
+              style={[styles.scanBtn, !isRecording && styles.disabledBtn]}
               onPress={handleBarcodeSubmit}
               disabled={!isRecording}
             >
-              <Ionicons name="add" size={20} color="#fff" />
+              <Ionicons name="add" size={18} color="#fff" />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Record Button */}
-        <View style={styles.recordSection}>
-          <TouchableOpacity
-            style={[styles.recordButton, isRecording && styles.recordButtonActive]}
-            onPress={isRecording ? stopRecording : startRecording}
-            activeOpacity={0.7}
-          >
-            <View style={[styles.recordButtonInner, isRecording && styles.recordButtonInnerActive]}>
-              {isRecording ? (
-                <View style={styles.stopIcon} />
-              ) : (
-                <View style={styles.recordIcon} />
-              )}
-            </View>
-          </TouchableOpacity>
-          <Text style={styles.recordButtonLabel}>
-            {isRecording ? 'STOP' : 'RECORD'}
-          </Text>
-        </View>
+        <TouchableOpacity
+          style={[styles.recordBtn, isRecording && styles.recordBtnActive]}
+          onPress={isRecording ? stopRecording : startRecording}
+          disabled={isUploading}
+        >
+          <View style={[styles.recordBtnInner, isRecording && styles.recordBtnInnerActive]}>
+            {isUploading ? (
+              <Ionicons name="cloud-upload" size={28} color="#fff" />
+            ) : isRecording ? (
+              <View style={styles.stopIcon} />
+            ) : (
+              <View style={styles.recordIcon} />
+            )}
+          </View>
+        </TouchableOpacity>
+        <Text style={styles.recordLabel}>
+          {isUploading ? 'UPLOADING...' : isRecording ? 'STOP' : 'RECORD'}
+        </Text>
 
-        {/* Quick Actions */}
-        <View style={styles.actionsSection}>
-          <TouchableOpacity style={styles.actionButton} onPress={() => router.push('/gallery')}>
-            <Ionicons name="folder-open" size={22} color="#fff" />
+        {/* Actions */}
+        <View style={styles.actions}>
+          <TouchableOpacity style={styles.actionBtn} onPress={() => router.push('/gallery')}>
+            <Ionicons name="folder" size={20} color="#fff" />
             <Text style={styles.actionLabel}>Gallery</Text>
           </TouchableOpacity>
-          
-          <TouchableOpacity style={styles.actionButton} onPress={handleLogout}>
-            <Ionicons name="power" size={22} color="#EF4444" />
-            <Text style={[styles.actionLabel, { color: '#EF4444' }]}>Exit</Text>
+          <TouchableOpacity style={styles.actionBtn} onPress={handleLogout}>
+            <Ionicons name="power" size={20} color="#EF4444" />
+            <Text style={[styles.actionLabel, {color: '#EF4444'}]}>Exit</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -427,356 +437,285 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: '#0A0A0A',
+    backgroundColor: '#000',
   },
-  cameraContainer: {
+  cameraArea: {
     flex: 1,
     position: 'relative',
   },
-  camera: {
-    flex: 1,
-  },
-  overlay: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  topBar: {
+  topOverlay: {
+    position: 'absolute',
+    top: 12,
+    left: 12,
+    right: 12,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    padding: 16,
+    alignItems: 'center',
   },
-  deviceInfo: {
-    alignItems: 'flex-start',
-  },
-  deviceIdBadge: {
+  deviceBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 6,
-    marginBottom: 6,
-  },
-  deviceIdText: {
-    color: '#fff',
-    fontSize: 12,
-    fontWeight: '700',
-    fontVariant: ['tabular-nums'],
-  },
-  boothName: {
-    color: '#fff',
-    fontSize: 14,
-    fontWeight: '500',
-    backgroundColor: 'rgba(0,0,0,0.5)',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
+    gap: 4,
   },
-  recordingStatus: {
-    alignItems: 'center',
+  deviceId: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '700',
   },
-  recIndicator: {
+  recBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(239, 68, 68, 0.9)',
-    paddingHorizontal: 12,
-    paddingVertical: 8,
-    borderRadius: 8,
-    gap: 8,
+    backgroundColor: '#DC2626',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 4,
+    gap: 6,
   },
   recDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
+    width: 8,
+    height: 8,
+    borderRadius: 4,
     backgroundColor: '#fff',
   },
   recText: {
     color: '#fff',
-    fontSize: 14,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  connectionInfo: {
-    alignItems: 'flex-end',
-  },
-  connectionBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 6,
-  },
-  online: {
-    backgroundColor: 'rgba(16, 185, 129, 0.2)',
-  },
-  offline: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
-  },
-  connectionDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-  },
-  onlineDot: {
-    backgroundColor: '#10B981',
-  },
-  offlineDot: {
-    backgroundColor: '#EF4444',
-  },
-  connectionText: {
-    color: '#fff',
-    fontSize: 10,
-    fontWeight: '700',
-    letterSpacing: 1,
-  },
-  timecodeOverlay: {
-    position: 'absolute',
-    top: 80,
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    borderRadius: 8,
-    borderLeftWidth: 3,
-    borderLeftColor: '#7C3AED',
-  },
-  timecodeRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  timecodeLabel: {
-    color: '#6B7280',
-    fontSize: 9,
-    fontWeight: '600',
-    width: 50,
-    letterSpacing: 1,
-  },
-  timecodeValue: {
-    color: '#fff',
-    fontSize: 13,
-    fontWeight: '600',
-    fontVariant: ['tabular-nums'],
-    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
-  },
-  timecodeDivider: {
-    height: 1,
-    backgroundColor: '#333',
-    marginVertical: 6,
-  },
-  timecodeRec: {
-    color: '#EF4444',
-  },
-  frameValue: {
-    color: '#7C3AED',
     fontSize: 11,
-  },
-  watermark: {
-    position: 'absolute',
-    bottom: 16,
-    right: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 6,
-    gap: 6,
-  },
-  watermarkLogo: {
-    width: 24,
-    height: 24,
-    borderRadius: 6,
-    backgroundColor: 'rgba(124, 58, 237, 0.3)',
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  watermarkText: {
-    color: 'rgba(255,255,255,0.7)',
-    fontSize: 16,
-    fontWeight: '800',
-    letterSpacing: 2,
-  },
-  barcodeStats: {
-    position: 'absolute',
-    bottom: 16,
-    left: 16,
-    backgroundColor: 'rgba(0,0,0,0.8)',
-    paddingHorizontal: 14,
-    paddingVertical: 10,
-    borderRadius: 8,
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  barcodeCountText: {
-    color: '#fff',
-    fontSize: 24,
     fontWeight: '800',
   },
-  barcodeCountLabel: {
-    color: '#6B7280',
-    fontSize: 10,
-    fontWeight: '600',
-    letterSpacing: 1,
-  },
-  lastBarcodeBadge: {
-    backgroundColor: 'rgba(124, 58, 237, 0.3)',
+  statusBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: 8,
     paddingVertical: 4,
     borderRadius: 4,
-    marginLeft: 8,
+    gap: 4,
   },
-  lastBarcodeText: {
-    color: '#A78BFA',
-    fontSize: 11,
-    fontWeight: '500',
+  online: { backgroundColor: 'rgba(16,185,129,0.3)' },
+  offline: { backgroundColor: 'rgba(239,68,68,0.3)' },
+  statusDot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
   },
-  controlPanel: {
-    width: 200,
-    backgroundColor: '#111111',
-    borderLeftWidth: 1,
-    borderLeftColor: '#1F1F1F',
-    padding: 16,
-    justifyContent: 'space-between',
-  },
-  sectionLabel: {
-    color: '#6B7280',
-    fontSize: 10,
+  onlineDot: { backgroundColor: '#10B981' },
+  offlineDot: { backgroundColor: '#EF4444' },
+  statusText: {
+    color: '#fff',
+    fontSize: 9,
     fontWeight: '700',
-    letterSpacing: 1,
-    marginBottom: 10,
   },
-  barcodeSection: {
-    marginBottom: 20,
+  timecodeBox: {
+    position: 'absolute',
+    top: 50,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    padding: 8,
+    borderRadius: 6,
+    borderLeftWidth: 2,
+    borderLeftColor: '#8B5CF6',
   },
-  barcodeInputWrapper: {
+  tcLabel: {
+    color: '#666',
+    fontSize: 8,
+    fontWeight: '600',
+  },
+  tcValue: {
+    color: '#fff',
+    fontSize: 11,
+    fontWeight: '600',
+    fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace',
+    marginBottom: 2,
+  },
+  tcDivider: {
+    height: 1,
+    backgroundColor: '#333',
+    marginVertical: 4,
+  },
+  tcRec: { color: '#EF4444' },
+  tcFrame: { color: '#8B5CF6', fontSize: 10 },
+  watermark: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#1A1A1A',
-    borderRadius: 10,
-    paddingLeft: 12,
-    borderWidth: 1,
-    borderColor: '#2D2D2D',
+    backgroundColor: 'rgba(0,0,0,0.6)',
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 4,
+    gap: 4,
+  },
+  watermarkText: {
+    color: 'rgba(255,255,255,0.6)',
+    fontSize: 12,
+    fontWeight: '800',
+  },
+  visitorBox: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
+    backgroundColor: 'rgba(0,0,0,0.8)',
+    paddingHorizontal: 10,
+    paddingVertical: 6,
+    borderRadius: 6,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  visitorCount: {
+    color: '#fff',
+    fontSize: 18,
+    fontWeight: '800',
+  },
+  lastScan: {
+    color: '#8B5CF6',
+    fontSize: 10,
+    marginLeft: 4,
+  },
+  controlPanel: {
+    width: 160,
+    backgroundColor: '#0A0A0A',
+    borderLeftWidth: 1,
+    borderLeftColor: '#1a1a1a',
+    padding: 12,
+    justifyContent: 'space-between',
+  },
+  boothName: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: '600',
+    textAlign: 'center',
+    marginBottom: 12,
+  },
+  sectionLabel: {
+    color: '#555',
+    fontSize: 9,
+    fontWeight: '700',
+    marginBottom: 6,
+  },
+  barcodeSection: {
+    marginBottom: 16,
+  },
+  barcodeInputRow: {
+    flexDirection: 'row',
+    gap: 4,
   },
   barcodeInput: {
     flex: 1,
-    paddingVertical: 12,
+    backgroundColor: '#111',
+    borderRadius: 6,
     paddingHorizontal: 8,
+    paddingVertical: 8,
     color: '#fff',
-    fontSize: 13,
+    fontSize: 12,
+    borderWidth: 1,
+    borderColor: '#222',
   },
-  scanButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 8,
-    backgroundColor: '#7C3AED',
+  scanBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 6,
+    backgroundColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
-    margin: 4,
   },
-  scanButtonDisabled: {
-    backgroundColor: '#3F3F46',
+  disabledBtn: {
+    backgroundColor: '#333',
   },
-  recordSection: {
-    alignItems: 'center',
-    flex: 1,
-    justifyContent: 'center',
-  },
-  recordButton: {
-    width: 100,
-    height: 100,
-    borderRadius: 50,
-    backgroundColor: 'rgba(124, 58, 237, 0.2)',
+  recordBtn: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: 'rgba(139,92,246,0.2)',
     justifyContent: 'center',
     alignItems: 'center',
-    borderWidth: 3,
-    borderColor: '#7C3AED',
+    alignSelf: 'center',
+    borderWidth: 2,
+    borderColor: '#8B5CF6',
   },
-  recordButtonActive: {
-    backgroundColor: 'rgba(239, 68, 68, 0.2)',
+  recordBtnActive: {
+    backgroundColor: 'rgba(239,68,68,0.2)',
     borderColor: '#EF4444',
   },
-  recordButtonInner: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    backgroundColor: '#7C3AED',
+  recordBtnInner: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#8B5CF6',
     justifyContent: 'center',
     alignItems: 'center',
   },
-  recordButtonInnerActive: {
+  recordBtnInnerActive: {
     backgroundColor: '#EF4444',
-    borderRadius: 12,
-    width: 50,
-    height: 50,
+    borderRadius: 8,
+    width: 40,
+    height: 40,
   },
   recordIcon: {
-    width: 30,
-    height: 30,
-    borderRadius: 15,
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     backgroundColor: '#fff',
   },
   stopIcon: {
-    width: 24,
-    height: 24,
+    width: 20,
+    height: 20,
+    borderRadius: 3,
     backgroundColor: '#fff',
-    borderRadius: 4,
   },
-  recordButtonLabel: {
-    color: '#fff',
-    fontSize: 12,
+  recordLabel: {
+    color: '#888',
+    fontSize: 10,
     fontWeight: '700',
-    marginTop: 12,
-    letterSpacing: 2,
+    textAlign: 'center',
+    marginTop: 8,
   },
-  actionsSection: {
+  actions: {
     flexDirection: 'row',
     justifyContent: 'space-around',
-    paddingTop: 16,
+    paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#1F1F1F',
+    borderTopColor: '#1a1a1a',
   },
-  actionButton: {
+  actionBtn: {
     alignItems: 'center',
-    padding: 10,
+    padding: 8,
   },
   actionLabel: {
-    color: '#9CA3AF',
-    fontSize: 10,
-    marginTop: 4,
-    fontWeight: '600',
+    color: '#888',
+    fontSize: 9,
+    marginTop: 2,
   },
   permissionContainer: {
     flex: 1,
     justifyContent: 'center',
     alignItems: 'center',
-    padding: 40,
   },
   permissionTitle: {
     color: '#fff',
-    fontSize: 24,
-    fontWeight: '700',
-    marginTop: 20,
-    marginBottom: 10,
+    fontSize: 18,
+    fontWeight: '600',
+    marginTop: 12,
   },
   permissionText: {
-    color: '#6B7280',
-    fontSize: 14,
-    textAlign: 'center',
-    marginBottom: 30,
+    color: '#666',
+    fontSize: 12,
+    marginTop: 4,
+    marginBottom: 20,
   },
   permissionButton: {
-    backgroundColor: '#7C3AED',
-    paddingHorizontal: 32,
-    paddingVertical: 14,
-    borderRadius: 12,
+    backgroundColor: '#8B5CF6',
+    paddingHorizontal: 24,
+    paddingVertical: 10,
+    borderRadius: 8,
   },
   permissionButtonText: {
     color: '#fff',
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '600',
   },
 });
