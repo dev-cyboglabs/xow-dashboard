@@ -589,8 +589,8 @@ async def upload_video(
         raise HTTPException(status_code=400, detail=str(e))
 
 @api_router.post("/recordings/{recording_id}/upload-audio")
-async def upload_audio(recording_id: str, audio: UploadFile = File(...)):
-    """Upload audio file for a recording"""
+async def upload_audio(recording_id: str, audio: UploadFile = File(...), background_tasks: BackgroundTasks = None):
+    """Upload audio file for a recording and automatically trigger transcription"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
@@ -608,11 +608,16 @@ async def upload_audio(recording_id: str, audio: UploadFile = File(...)):
             {"_id": ObjectId(recording_id)},
             {"$set": {
                 "audio_file_id": str(audio_id),
-                "has_audio": True
+                "has_audio": True,
+                "status": "processing"
             }}
         )
         
-        return {"success": True, "audio_id": str(audio_id)}
+        # Automatically trigger transcription and AI analysis
+        if background_tasks:
+            background_tasks.add_task(process_transcription_with_diarization, recording_id)
+        
+        return {"success": True, "audio_id": str(audio_id), "message": "Audio uploaded, transcription started automatically"}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
