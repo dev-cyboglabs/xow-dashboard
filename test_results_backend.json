@@ -3,7 +3,7 @@
     "test": "API Root Endpoint",
     "success": true,
     "details": "GET https://expo-stall-hub.preview.emergentagent.com/api/",
-    "timestamp": "2026-02-15T14:14:46.993315",
+    "timestamp": "2026-02-15T16:26:13.575058",
     "status_code": 200,
     "response": {
       "message": "XoW Expo Recording System API",
@@ -14,33 +14,24 @@
     "test": "Health Check Endpoint",
     "success": true,
     "details": "GET https://expo-stall-hub.preview.emergentagent.com/api/health",
-    "timestamp": "2026-02-15T14:14:47.049427",
+    "timestamp": "2026-02-15T16:26:13.640308",
     "status_code": 200,
     "response": {
       "status": "healthy",
-      "timestamp": "2026-02-15T14:14:47.032025"
+      "timestamp": "2026-02-15T16:26:13.622749"
     }
   },
   {
     "test": "Device Registration",
     "success": true,
-    "details": "New device registered successfully",
-    "timestamp": "2026-02-15T14:14:47.101697",
-    "status_code": 200,
-    "response": {
-      "device_id": "BOOTH-TEST-001",
-      "password": "test123456",
-      "name": "Test Booth Device",
-      "created_at": "2026-02-15T14:14:47.083088",
-      "is_active": true,
-      "id": "6991d4d79be4317af5e2ad69"
-    }
+    "details": "Device already exists (expected for repeated tests)",
+    "timestamp": "2026-02-15T16:26:13.709008"
   },
   {
     "test": "Device Login",
     "success": true,
     "details": "Login with registered device",
-    "timestamp": "2026-02-15T14:14:47.167206",
+    "timestamp": "2026-02-15T16:26:13.758121",
     "status_code": 200,
     "response": {
       "success": true,
@@ -59,19 +50,19 @@
     "test": "Invalid Login Rejection",
     "success": true,
     "details": "Should reject invalid credentials",
-    "timestamp": "2026-02-15T14:14:47.216981"
+    "timestamp": "2026-02-15T16:26:13.808851"
   },
   {
     "test": "Create Recording",
     "success": true,
-    "details": "Recording ID: 6991d4d79be4317af5e2ad6a",
-    "timestamp": "2026-02-15T14:14:47.278758",
+    "details": "Recording ID: 6991f3a51a7dfbced23a775f",
+    "timestamp": "2026-02-15T16:26:13.873548",
     "status_code": 200,
     "response": {
       "device_id": "BOOTH-TEST-001",
       "expo_name": "Tech Expo 2024",
       "booth_name": "Innovation Showcase",
-      "start_time": "2026-02-15T14:14:47.253699",
+      "start_time": "2026-02-15T16:26:13.846522",
       "end_time": null,
       "duration": null,
       "status": "recording",
@@ -84,20 +75,20 @@
       "summary": null,
       "highlights": [],
       "barcode_scans": [],
-      "id": "6991d4d79be4317af5e2ad6a"
+      "id": "6991f3a51a7dfbced23a775f"
     }
   },
   {
     "test": "Get Specific Recording",
     "success": true,
-    "details": "Retrieved recording 6991d4d79be4317af5e2ad6a",
-    "timestamp": "2026-02-15T14:14:47.331572",
+    "details": "Retrieved recording 6991f3a51a7dfbced23a775f",
+    "timestamp": "2026-02-15T16:26:13.940618",
     "status_code": 200,
     "response": {
       "device_id": "BOOTH-TEST-001",
       "expo_name": "Tech Expo 2024",
       "booth_name": "Innovation Showcase",
-      "start_time": "2026-02-15T14:14:47.253000",
+      "start_time": "2026-02-15T16:26:13.846000",
       "end_time": null,
       "duration": null,
       "status": "recording",
@@ -110,21 +101,21 @@
       "summary": null,
       "highlights": [],
       "barcode_scans": [],
-      "id": "6991d4d79be4317af5e2ad6a"
+      "id": "6991f3a51a7dfbced23a775f"
     }
   },
   {
     "test": "Get All Recordings",
     "success": true,
-    "details": "Retrieved 2 recordings",
-    "timestamp": "2026-02-15T14:14:47.379844",
+    "details": "Retrieved 7 recordings",
+    "timestamp": "2026-02-15T16:26:14.002877",
     "status_code": 200,
     "response": [
       {
         "device_id": "BOOTH-TEST-001",
         "expo_name": "Tech Expo 2024",
         "booth_name": "Innovation Showcase",
-        "start_time": "2026-02-15T14:14:47.253000",
+        "start_time": "2026-02-15T16:26:13.846000",
         "end_time": null,
         "duration": null,
         "status": "recording",
@@ -137,6 +128,118 @@
         "summary": null,
         "highlights": [],
         "barcode_scans": [],
+        "id": "6991f3a51a7dfbced23a775f"
+      },
+      {
+        "device_id": "e828w8",
+        "expo_name": "Expo 2025",
+        "booth_name": "Eusidnd",
+        "start_time": "2026-02-15T15:53:26.080000",
+        "end_time": "2026-02-15T15:53:42.749000",
+        "duration": 16.669331,
+        "status": "processed",
+        "has_video": false,
+        "has_audio": true,
+        "video_file_id": null,
+        "audio_file_id": "6991ec06b5b4eadcb3922883",
+        "transcript": "",
+        "translated_transcript": null,
+        "summary": "",
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991ebf6b5b4eadcb3922882"
+      },
+      {
+        "device_id": "23242",
+        "expo_name": "Expo 2025",
+        "booth_name": "sgsgsrgrsg",
+        "start_time": "2026-02-15T15:46:59.687000",
+        "end_time": "2026-02-15T15:47:09.434000",
+        "duration": 9.747916,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991ea73b5b4eadcb3922880"
+      },
+      {
+        "device_id": "162636",
+        "expo_name": "Expo 2025",
+        "booth_name": "Hdududu",
+        "start_time": "2026-02-15T15:17:07.482000",
+        "end_time": "2026-02-15T15:17:21.719000",
+        "duration": 14.237842,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": true,
+        "video_file_id": null,
+        "audio_file_id": "6991e3812e112da20dfdd4ce",
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991e3732e112da20dfdd4cd"
+      },
+      {
+        "device_id": "162636",
+        "expo_name": "Expo 2025",
+        "booth_name": "Hdududu",
+        "start_time": "2026-02-15T14:20:32.005000",
+        "end_time": null,
+        "duration": null,
+        "status": "recording",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991d6309be4317af5e2ad6e"
+      },
+      {
+        "device_id": "BOOTH-TEST-001",
+        "expo_name": "Tech Expo 2024",
+        "booth_name": "Innovation Showcase",
+        "start_time": "2026-02-15T14:14:47.253000",
+        "end_time": "2026-02-15T14:14:49.690000",
+        "duration": 2.437476,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [
+          {
+            "recording_id": "6991d4d79be4317af5e2ad6a",
+            "barcode_data": "VISITOR-001-ABC123",
+            "visitor_name": "John Smith",
+            "scan_time": "2026-02-15T14:14:47.515000",
+            "video_timestamp": 120.5,
+            "_id": "6991d4d79be4317af5e2ad6b"
+          },
+          {
+            "recording_id": "6991d4d79be4317af5e2ad6a",
+            "barcode_data": "VISITOR-002-DEF456",
+            "visitor_name": "Jane Doe",
+            "scan_time": "2026-02-15T14:14:47.570000",
+            "video_timestamp": 245.7,
+            "_id": "6991d4d79be4317af5e2ad6c"
+          }
+        ],
         "id": "6991d4d79be4317af5e2ad6a"
       },
       {
@@ -173,14 +276,14 @@
     "test": "Get Recordings by Device",
     "success": true,
     "details": "Filter by device_id=BOOTH-TEST-001",
-    "timestamp": "2026-02-15T14:14:47.449093",
+    "timestamp": "2026-02-15T16:26:14.059445",
     "status_code": 200,
     "response": [
       {
         "device_id": "BOOTH-TEST-001",
         "expo_name": "Tech Expo 2024",
         "booth_name": "Innovation Showcase",
-        "start_time": "2026-02-15T14:14:47.253000",
+        "start_time": "2026-02-15T16:26:13.846000",
         "end_time": null,
         "duration": null,
         "status": "recording",
@@ -193,6 +296,42 @@
         "summary": null,
         "highlights": [],
         "barcode_scans": [],
+        "id": "6991f3a51a7dfbced23a775f"
+      },
+      {
+        "device_id": "BOOTH-TEST-001",
+        "expo_name": "Tech Expo 2024",
+        "booth_name": "Innovation Showcase",
+        "start_time": "2026-02-15T14:14:47.253000",
+        "end_time": "2026-02-15T14:14:49.690000",
+        "duration": 2.437476,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [
+          {
+            "recording_id": "6991d4d79be4317af5e2ad6a",
+            "barcode_data": "VISITOR-001-ABC123",
+            "visitor_name": "John Smith",
+            "scan_time": "2026-02-15T14:14:47.515000",
+            "video_timestamp": 120.5,
+            "_id": "6991d4d79be4317af5e2ad6b"
+          },
+          {
+            "recording_id": "6991d4d79be4317af5e2ad6a",
+            "barcode_data": "VISITOR-002-DEF456",
+            "visitor_name": "Jane Doe",
+            "scan_time": "2026-02-15T14:14:47.570000",
+            "video_timestamp": 245.7,
+            "_id": "6991d4d79be4317af5e2ad6c"
+          }
+        ],
         "id": "6991d4d79be4317af5e2ad6a"
       }
     ]
@@ -201,54 +340,58 @@
     "test": "Create Barcode Scan 1",
     "success": true,
     "details": "First visitor scan",
-    "timestamp": "2026-02-15T14:14:47.535989",
+    "timestamp": "2026-02-15T16:26:14.123539",
     "status_code": 200,
     "response": {
-      "recording_id": "6991d4d79be4317af5e2ad6a",
+      "recording_id": "6991f3a51a7dfbced23a775f",
       "barcode_data": "VISITOR-001-ABC123",
       "visitor_name": "John Smith",
-      "scan_time": "2026-02-15T14:14:47.515649",
+      "scan_time": "2026-02-15T16:26:14.090698",
       "video_timestamp": 120.5,
-      "id": "6991d4d79be4317af5e2ad6b"
+      "frame_code": null,
+      "id": "6991f3a61a7dfbced23a7760"
     }
   },
   {
     "test": "Create Barcode Scan 2",
     "success": true,
     "details": "Second visitor scan",
-    "timestamp": "2026-02-15T14:14:47.594166",
+    "timestamp": "2026-02-15T16:26:14.174052",
     "status_code": 200,
     "response": {
-      "recording_id": "6991d4d79be4317af5e2ad6a",
+      "recording_id": "6991f3a51a7dfbced23a775f",
       "barcode_data": "VISITOR-002-DEF456",
       "visitor_name": "Jane Doe",
-      "scan_time": "2026-02-15T14:14:47.570997",
+      "scan_time": "2026-02-15T16:26:14.152682",
       "video_timestamp": 245.7,
-      "id": "6991d4d79be4317af5e2ad6c"
+      "frame_code": null,
+      "id": "6991f3a61a7dfbced23a7761"
     }
   },
   {
     "test": "Get Barcode Scans",
     "success": true,
     "details": "Retrieved 2 scans for recording",
-    "timestamp": "2026-02-15T14:14:47.655333",
+    "timestamp": "2026-02-15T16:26:14.241497",
     "status_code": 200,
     "response": [
       {
-        "recording_id": "6991d4d79be4317af5e2ad6a",
+        "recording_id": "6991f3a51a7dfbced23a775f",
         "barcode_data": "VISITOR-001-ABC123",
         "visitor_name": "John Smith",
-        "scan_time": "2026-02-15T14:14:47.515000",
+        "scan_time": "2026-02-15T16:26:14.090000",
         "video_timestamp": 120.5,
-        "id": "6991d4d79be4317af5e2ad6b"
+        "frame_code": null,
+        "id": "6991f3a61a7dfbced23a7760"
       },
       {
-        "recording_id": "6991d4d79be4317af5e2ad6a",
+        "recording_id": "6991f3a51a7dfbced23a775f",
         "barcode_data": "VISITOR-002-DEF456",
         "visitor_name": "Jane Doe",
-        "scan_time": "2026-02-15T14:14:47.570000",
+        "scan_time": "2026-02-15T16:26:14.152000",
         "video_timestamp": 245.7,
-        "id": "6991d4d79be4317af5e2ad6c"
+        "frame_code": null,
+        "id": "6991f3a61a7dfbced23a7761"
       }
     ]
   },
@@ -256,15 +399,15 @@
     "test": "Complete Recording",
     "success": true,
     "details": "Recording completed, duration: 2.44 seconds",
-    "timestamp": "2026-02-15T14:14:49.712835",
+    "timestamp": "2026-02-15T16:26:16.309357",
     "status_code": 200,
     "response": {
       "device_id": "BOOTH-TEST-001",
       "expo_name": "Tech Expo 2024",
       "booth_name": "Innovation Showcase",
-      "start_time": "2026-02-15T14:14:47.253000",
-      "end_time": "2026-02-15T14:14:49.690000",
-      "duration": 2.437476,
+      "start_time": "2026-02-15T16:26:13.846000",
+      "end_time": "2026-02-15T16:26:16.286000",
+      "duration": 2.440699,
       "status": "completed",
       "has_video": false,
       "has_audio": false,
@@ -276,44 +419,46 @@
       "highlights": [],
       "barcode_scans": [
         {
-          "recording_id": "6991d4d79be4317af5e2ad6a",
+          "recording_id": "6991f3a51a7dfbced23a775f",
           "barcode_data": "VISITOR-001-ABC123",
           "visitor_name": "John Smith",
-          "scan_time": "2026-02-15T14:14:47.515000",
+          "scan_time": "2026-02-15T16:26:14.090000",
           "video_timestamp": 120.5,
-          "_id": "6991d4d79be4317af5e2ad6b"
+          "frame_code": null,
+          "_id": "6991f3a61a7dfbced23a7760"
         },
         {
-          "recording_id": "6991d4d79be4317af5e2ad6a",
+          "recording_id": "6991f3a51a7dfbced23a775f",
           "barcode_data": "VISITOR-002-DEF456",
           "visitor_name": "Jane Doe",
-          "scan_time": "2026-02-15T14:14:47.570000",
+          "scan_time": "2026-02-15T16:26:14.152000",
           "video_timestamp": 245.7,
-          "_id": "6991d4d79be4317af5e2ad6c"
+          "frame_code": null,
+          "_id": "6991f3a61a7dfbced23a7761"
         }
       ],
-      "id": "6991d4d79be4317af5e2ad6a"
+      "id": "6991f3a51a7dfbced23a775f"
     }
   },
   {
     "test": "Dashboard Insights",
     "success": true,
-    "details": "Recordings: 2, Visitors: 3, Duration: 0.01h",
-    "timestamp": "2026-02-15T14:14:49.774842",
+    "details": "Recordings: 7, Visitors: 3, Duration: 0.02h",
+    "timestamp": "2026-02-15T16:26:16.369132",
     "status_code": 200,
     "response": {
-      "total_recordings": 2,
+      "total_recordings": 7,
       "total_visitors": 3,
-      "total_duration_hours": 0.01,
+      "total_duration_hours": 0.02,
       "top_topics": [],
       "recent_activity": [
         {
           "device_id": "BOOTH-TEST-001",
           "expo_name": "Tech Expo 2024",
           "booth_name": "Innovation Showcase",
-          "start_time": "2026-02-15T14:14:47.253000",
-          "end_time": "2026-02-15T14:14:49.690000",
-          "duration": 2.437476,
+          "start_time": "2026-02-15T16:26:13.846000",
+          "end_time": "2026-02-15T16:26:16.286000",
+          "duration": 2.440699,
           "status": "completed",
           "has_video": false,
           "has_audio": false,
@@ -325,31 +470,52 @@
           "highlights": [],
           "barcode_scans": [
             {
-              "recording_id": "6991d4d79be4317af5e2ad6a",
+              "recording_id": "6991f3a51a7dfbced23a775f",
               "barcode_data": "VISITOR-001-ABC123",
               "visitor_name": "John Smith",
-              "scan_time": "2026-02-15T14:14:47.515000",
+              "scan_time": "2026-02-15T16:26:14.090000",
               "video_timestamp": 120.5,
-              "_id": "6991d4d79be4317af5e2ad6b"
+              "frame_code": null,
+              "_id": "6991f3a61a7dfbced23a7760"
             },
             {
-              "recording_id": "6991d4d79be4317af5e2ad6a",
+              "recording_id": "6991f3a51a7dfbced23a775f",
               "barcode_data": "VISITOR-002-DEF456",
               "visitor_name": "Jane Doe",
-              "scan_time": "2026-02-15T14:14:47.570000",
+              "scan_time": "2026-02-15T16:26:14.152000",
               "video_timestamp": 245.7,
-              "_id": "6991d4d79be4317af5e2ad6c"
+              "frame_code": null,
+              "_id": "6991f3a61a7dfbced23a7761"
             }
           ],
-          "id": "6991d4d79be4317af5e2ad6a"
+          "id": "6991f3a51a7dfbced23a775f"
         },
         {
-          "device_id": "BOOTH-001",
-          "expo_name": "Tech Expo 2025",
-          "booth_name": "Tech Expo Booth A1",
-          "start_time": "2026-02-15T14:12:13.950000",
-          "end_time": "2026-02-15T14:12:38.657000",
-          "duration": 24.707676,
+          "device_id": "e828w8",
+          "expo_name": "Expo 2025",
+          "booth_name": "Eusidnd",
+          "start_time": "2026-02-15T15:53:26.080000",
+          "end_time": "2026-02-15T15:53:42.749000",
+          "duration": 16.669331,
+          "status": "processed",
+          "has_video": false,
+          "has_audio": true,
+          "video_file_id": null,
+          "audio_file_id": "6991ec06b5b4eadcb3922883",
+          "transcript": "",
+          "translated_transcript": null,
+          "summary": "",
+          "highlights": [],
+          "barcode_scans": [],
+          "id": "6991ebf6b5b4eadcb3922882"
+        },
+        {
+          "device_id": "23242",
+          "expo_name": "Expo 2025",
+          "booth_name": "sgsgsrgrsg",
+          "start_time": "2026-02-15T15:46:59.687000",
+          "end_time": "2026-02-15T15:47:09.434000",
+          "duration": 9.747916,
           "status": "completed",
           "has_video": false,
           "has_audio": false,
@@ -359,17 +525,46 @@
           "translated_transcript": null,
           "summary": null,
           "highlights": [],
-          "barcode_scans": [
-            {
-              "recording_id": "6991d43dcf8eca1efac02a7b",
-              "barcode_data": "VISITOR-12345",
-              "visitor_name": "John Doe",
-              "scan_time": "2026-02-15T14:12:18.434000",
-              "video_timestamp": 45.5,
-              "_id": "6991d442cf8eca1efac02a7c"
-            }
-          ],
-          "id": "6991d43dcf8eca1efac02a7b"
+          "barcode_scans": [],
+          "id": "6991ea73b5b4eadcb3922880"
+        },
+        {
+          "device_id": "162636",
+          "expo_name": "Expo 2025",
+          "booth_name": "Hdududu",
+          "start_time": "2026-02-15T15:17:07.482000",
+          "end_time": "2026-02-15T15:17:21.719000",
+          "duration": 14.237842,
+          "status": "completed",
+          "has_video": false,
+          "has_audio": true,
+          "video_file_id": null,
+          "audio_file_id": "6991e3812e112da20dfdd4ce",
+          "transcript": null,
+          "translated_transcript": null,
+          "summary": null,
+          "highlights": [],
+          "barcode_scans": [],
+          "id": "6991e3732e112da20dfdd4cd"
+        },
+        {
+          "device_id": "162636",
+          "expo_name": "Expo 2025",
+          "booth_name": "Hdududu",
+          "start_time": "2026-02-15T14:20:32.005000",
+          "end_time": null,
+          "duration": null,
+          "status": "recording",
+          "has_video": false,
+          "has_audio": false,
+          "video_file_id": null,
+          "audio_file_id": null,
+          "transcript": null,
+          "translated_transcript": null,
+          "summary": null,
+          "highlights": [],
+          "barcode_scans": [],
+          "id": "6991d6309be4317af5e2ad6e"
         }
       ]
     }
@@ -377,10 +572,129 @@
   {
     "test": "Dashboard Recordings",
     "success": true,
-    "details": "Retrieved 2 dashboard recordings with scan counts",
-    "timestamp": "2026-02-15T14:14:49.836283",
+    "details": "Retrieved 7 dashboard recordings with scan counts",
+    "timestamp": "2026-02-15T16:26:16.433021",
     "status_code": 200,
     "response": [
+      {
+        "device_id": "BOOTH-TEST-001",
+        "expo_name": "Tech Expo 2024",
+        "booth_name": "Innovation Showcase",
+        "start_time": "2026-02-15T16:26:13.846000",
+        "end_time": "2026-02-15T16:26:16.286000",
+        "duration": 2.440699,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [
+          {
+            "recording_id": "6991f3a51a7dfbced23a775f",
+            "barcode_data": "VISITOR-001-ABC123",
+            "visitor_name": "John Smith",
+            "scan_time": "2026-02-15T16:26:14.090000",
+            "video_timestamp": 120.5,
+            "frame_code": null,
+            "_id": "6991f3a61a7dfbced23a7760"
+          },
+          {
+            "recording_id": "6991f3a51a7dfbced23a775f",
+            "barcode_data": "VISITOR-002-DEF456",
+            "visitor_name": "Jane Doe",
+            "scan_time": "2026-02-15T16:26:14.152000",
+            "video_timestamp": 245.7,
+            "frame_code": null,
+            "_id": "6991f3a61a7dfbced23a7761"
+          }
+        ],
+        "id": "6991f3a51a7dfbced23a775f",
+        "scans_count": 2
+      },
+      {
+        "device_id": "e828w8",
+        "expo_name": "Expo 2025",
+        "booth_name": "Eusidnd",
+        "start_time": "2026-02-15T15:53:26.080000",
+        "end_time": "2026-02-15T15:53:42.749000",
+        "duration": 16.669331,
+        "status": "processed",
+        "has_video": false,
+        "has_audio": true,
+        "video_file_id": null,
+        "audio_file_id": "6991ec06b5b4eadcb3922883",
+        "transcript": "",
+        "translated_transcript": null,
+        "summary": "",
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991ebf6b5b4eadcb3922882",
+        "scans_count": 0
+      },
+      {
+        "device_id": "23242",
+        "expo_name": "Expo 2025",
+        "booth_name": "sgsgsrgrsg",
+        "start_time": "2026-02-15T15:46:59.687000",
+        "end_time": "2026-02-15T15:47:09.434000",
+        "duration": 9.747916,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991ea73b5b4eadcb3922880",
+        "scans_count": 0
+      },
+      {
+        "device_id": "162636",
+        "expo_name": "Expo 2025",
+        "booth_name": "Hdududu",
+        "start_time": "2026-02-15T15:17:07.482000",
+        "end_time": "2026-02-15T15:17:21.719000",
+        "duration": 14.237842,
+        "status": "completed",
+        "has_video": false,
+        "has_audio": true,
+        "video_file_id": null,
+        "audio_file_id": "6991e3812e112da20dfdd4ce",
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991e3732e112da20dfdd4cd",
+        "scans_count": 0
+      },
+      {
+        "device_id": "162636",
+        "expo_name": "Expo 2025",
+        "booth_name": "Hdududu",
+        "start_time": "2026-02-15T14:20:32.005000",
+        "end_time": null,
+        "duration": null,
+        "status": "recording",
+        "has_video": false,
+        "has_audio": false,
+        "video_file_id": null,
+        "audio_file_id": null,
+        "transcript": null,
+        "translated_transcript": null,
+        "summary": null,
+        "highlights": [],
+        "barcode_scans": [],
+        "id": "6991d6309be4317af5e2ad6e",
+        "scans_count": 0
+      },
       {
         "device_id": "BOOTH-TEST-001",
         "expo_name": "Tech Expo 2024",
@@ -452,10 +766,28 @@
   {
     "test": "Dashboard Visitors",
     "success": true,
-    "details": "Retrieved 3 visitor scans",
-    "timestamp": "2026-02-15T14:14:49.902351",
+    "details": "Retrieved 5 visitor scans",
+    "timestamp": "2026-02-15T16:26:16.484284",
     "status_code": 200,
     "response": [
+      {
+        "recording_id": "6991f3a51a7dfbced23a775f",
+        "barcode_data": "VISITOR-002-DEF456",
+        "visitor_name": "Jane Doe",
+        "scan_time": "2026-02-15T16:26:14.152000",
+        "video_timestamp": 245.7,
+        "frame_code": null,
+        "id": "6991f3a61a7dfbced23a7761"
+      },
+      {
+        "recording_id": "6991f3a51a7dfbced23a775f",
+        "barcode_data": "VISITOR-001-ABC123",
+        "visitor_name": "John Smith",
+        "scan_time": "2026-02-15T16:26:14.090000",
+        "video_timestamp": 120.5,
+        "frame_code": null,
+        "id": "6991f3a61a7dfbced23a7760"
+      },
       {
         "recording_id": "6991d4d79be4317af5e2ad6a",
         "barcode_data": "VISITOR-002-DEF456",
@@ -485,25 +817,27 @@
   {
     "test": "Visitors by Recording",
     "success": true,
-    "details": "Retrieved 2 visitors for recording 6991d4d79be4317af5e2ad6a",
-    "timestamp": "2026-02-15T14:14:49.986103",
+    "details": "Retrieved 2 visitors for recording 6991f3a51a7dfbced23a775f",
+    "timestamp": "2026-02-15T16:26:16.540294",
     "status_code": 200,
     "response": [
       {
-        "recording_id": "6991d4d79be4317af5e2ad6a",
+        "recording_id": "6991f3a51a7dfbced23a775f",
         "barcode_data": "VISITOR-002-DEF456",
         "visitor_name": "Jane Doe",
-        "scan_time": "2026-02-15T14:14:47.570000",
+        "scan_time": "2026-02-15T16:26:14.152000",
         "video_timestamp": 245.7,
-        "id": "6991d4d79be4317af5e2ad6c"
+        "frame_code": null,
+        "id": "6991f3a61a7dfbced23a7761"
       },
       {
-        "recording_id": "6991d4d79be4317af5e2ad6a",
+        "recording_id": "6991f3a51a7dfbced23a775f",
         "barcode_data": "VISITOR-001-ABC123",
         "visitor_name": "John Smith",
-        "scan_time": "2026-02-15T14:14:47.515000",
+        "scan_time": "2026-02-15T16:26:14.090000",
         "video_timestamp": 120.5,
-        "id": "6991d4d79be4317af5e2ad6b"
+        "frame_code": null,
+        "id": "6991f3a61a7dfbced23a7760"
       }
     ]
   }
