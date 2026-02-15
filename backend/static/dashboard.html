@@ -269,6 +269,8 @@
         }
 
         function renderSessionCard(r) {
+            const speakers = r.speakers || [];
+            const hasSpeakers = speakers.length > 0;
             const conversations = r.conversations || [];
             const hasConversations = conversations.length > 0;
             
@@ -282,7 +284,7 @@
                         </div>
                         <div>
                             <div class="font-semibold text-lg">${r.booth_name}</div>
-                            <div class="text-sm text-gray-500">${fmtDate(r.start_time)} • Duration: ${fmtDur(r.duration)}</div>
+                            <div class="text-sm text-gray-500">${fmtDate(r.start_time)} • Duration: ${fmtDur(r.duration)}${r.total_speakers ? ` • ${r.total_speakers} speakers` : ''}</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
@@ -291,28 +293,39 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                             Retry
                         </button>` : ''}
-                        ${r.has_audio ? `<button onclick="playVideo('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2 bg-purple hover:bg-[#7C3AED] rounded-lg text-white text-sm transition-colors">
+                        ${hasSpeakers ? `<button onclick="showDetailedInsights('${r.id}')" class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] hover:opacity-90 rounded-lg text-white text-sm transition-all font-medium">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                            Detailed Insights
+                        </button>` : ''}
+                        ${r.has_audio ? `<button onclick="playVideo('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] rounded-lg text-white text-sm transition-colors">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             Play
                         </button>` : ''}
                         <button onclick="deleteRecording('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600 rounded-lg text-red-400 hover:text-white text-sm transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
-                            Delete
                         </button>
                     </div>
                 </div>
                 
-                <!-- AI Summary -->
-                ${r.summary ? `
+                <!-- Overall AI Summary (Always visible) -->
+                ${r.overall_summary || r.summary ? `
                 <div class="p-4 bg-gradient-to-r from-[#8B5CF6]/10 to-transparent border-b border-[#1a1a1a]">
                     <div class="flex items-center gap-2 mb-2">
                         <svg class="w-4 h-4 purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                        <span class="text-sm font-medium purple">AI Summary</span>
+                        <span class="text-sm font-medium purple">Overall Summary</span>
+                        ${r.host_identified ? `<span class="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full ml-2">Host Identified</span>` : ''}
                     </div>
-                    <p class="text-gray-300">${r.summary}</p>
-                    ${r.highlights && r.highlights.length > 0 ? `
+                    <p class="text-gray-300">${r.overall_summary || r.summary}</p>
+                    ${r.main_topics && r.main_topics.length > 0 ? `
                     <div class="flex flex-wrap gap-2 mt-3">
-                        ${r.highlights.slice(0, 5).map(h => `<span class="text-xs px-2 py-1 bg-[#111] rounded-full text-gray-400">${h}</span>`).join('')}
+                        ${r.main_topics.slice(0, 6).map(t => `<span class="text-xs px-2 py-1 bg-[#111] rounded-full text-gray-400">${t}</span>`).join('')}
+                    </div>` : ''}
+                    ${r.follow_up_actions && r.follow_up_actions.length > 0 ? `
+                    <div class="mt-3 pt-3 border-t border-[#1a1a1a]">
+                        <div class="text-xs text-amber-400 font-medium mb-1">Follow-up Actions:</div>
+                        <ul class="text-xs text-gray-400 list-disc list-inside">
+                            ${r.follow_up_actions.map(a => `<li>${a}</li>`).join('')}
+                        </ul>
                     </div>` : ''}
                 </div>` : r.status === 'processing' || r.status === 'uploaded' ? `
                 <div class="p-4 bg-[#111] border-b border-[#1a1a1a]">
@@ -320,7 +333,7 @@
                         <div class="loading">
                             <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         </div>
-                        <span class="text-sm">Processing audio... AI analysis in progress</span>
+                        <span class="text-sm">Processing audio with AI speaker diarization...</span>
                     </div>
                 </div>` : (!r.transcript && r.status !== 'error') ? `
                 <div class="p-4 bg-[#111] border-b border-[#1a1a1a]">
@@ -342,56 +355,176 @@
                     </div>
                 </div>` : ''}
                 
-                <!-- Conversations Grid -->
-                ${hasConversations ? `
-                <div class="p-4">
-                    <div class="flex items-center justify-between mb-4">
-                        <h4 class="text-sm font-medium text-gray-400">Detected Conversations (${conversations.length})</h4>
-                        <span class="text-xs text-gray-600">Click to play from timestamp</span>
-                    </div>
-                    <div class="grid grid-cols-2 lg:grid-cols-3 gap-3">
-                        ${conversations.map((conv, idx) => `
-                            <div class="conv-card card p-4 cursor-pointer relative group" onclick="playVideo('${r.id}','${r.booth_name}',${conv.start_time || 0})">
-                                <div class="play-overlay absolute inset-0 bg-[#8B5CF6]/20 rounded-lg flex items-center justify-center">
-                                    <div class="w-10 h-10 bg-purple rounded-full flex items-center justify-center">
-                                        <svg class="w-5 h-5 text-white ml-0.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                                    </div>
-                                </div>
-                                <div class="flex items-center justify-between mb-2">
-                                    <span class="text-xs font-mono purple">${fmtDur(conv.start_time)}</span>
-                                    <span class="text-xs px-1.5 py-0.5 rounded ${sentimentClass(conv.sentiment)}">${conv.sentiment || 'neutral'}</span>
-                                </div>
-                                <h5 class="font-medium text-sm mb-1 line-clamp-1">${conv.title || `Conversation ${idx + 1}`}</h5>
-                                <p class="text-xs text-gray-500 line-clamp-2 mb-2">${conv.summary || ''}</p>
-                                ${conv.speakers ? `<div class="text-xs text-gray-600">${conv.speakers.join(', ')}</div>` : ''}
-                                ${conv.associated_barcodes && conv.associated_barcodes.length > 0 ? `
-                                    <div class="mt-2 pt-2 border-t border-[#1a1a1a]">
-                                        <div class="flex items-center gap-1 text-xs text-green-400">
-                                            <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
-                                            <span>${conv.associated_barcodes.join(', ')}</span>
-                                        </div>
-                                    </div>
-                                ` : ''}
-                            </div>
-                        `).join('')}
-                    </div>
-                </div>` : ''}
+                <!-- Speaker Boxes (PLAUD Style) - Collapsed by default -->
+                <div id="speakers-${r.id}" class="hidden">
+                    ${hasSpeakers ? `
+                    <div class="p-4 border-t border-[#1a1a1a]">
+                        <div class="flex items-center justify-between mb-4">
+                            <h4 class="text-sm font-semibold text-white flex items-center gap-2">
+                                <svg class="w-4 h-4 purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                Speakers (${speakers.length})
+                            </h4>
+                            <button onclick="hideDetailedInsights('${r.id}')" class="text-xs text-gray-400 hover:text-white">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                        <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+                            ${speakers.map((speaker, idx) => renderSpeakerBox(speaker, idx, r.id, r.booth_name)).join('')}
+                        </div>
+                    </div>` : ''}
+                </div>
                 
-                <!-- Barcode Scans (if no conversations detected) -->
-                ${!hasConversations && r.barcode_scans && r.barcode_scans.length > 0 ? `
-                <div class="p-4">
-                    <div class="text-xs text-gray-500 mb-3">Visitor Scans (${r.barcode_scans.length})</div>
+                <!-- Barcode Scans (if any) -->
+                ${r.barcode_scans && r.barcode_scans.length > 0 ? `
+                <div class="p-4 border-t border-[#1a1a1a]">
+                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                        Visitor Scans (${r.barcode_scans.length})
+                    </div>
                     <div class="flex flex-wrap gap-2">
                         ${r.barcode_scans.map(s => `
                             <div class="flex items-center gap-2 px-3 py-2 bg-[#111] rounded-lg cursor-pointer hover:bg-[#1a1a1a] ${r.has_audio ? '' : 'pointer-events-none'}" onclick="playVideo('${r.id}','${r.booth_name}',${s.video_timestamp||0})">
-                                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
                                 <span class="text-sm font-medium">${s.barcode_data}</span>
-                                <span class="text-xs text-gray-500">@ ${fmtDur(s.video_timestamp)}</span>
+                                ${s.video_timestamp ? `<span class="text-xs text-gray-500">@ ${fmtDur(s.video_timestamp)}</span>` : ''}
                             </div>
                         `).join('')}
                     </div>
                 </div>` : ''}
             </div>`;
+        }
+
+        function renderSpeakerBox(speaker, idx, recordingId, boothName) {
+            const isHost = speaker.is_host;
+            const labelSource = speaker.label_source;
+            const segments = speaker.dialogue_segments || [];
+            const firstSegment = segments[0];
+            
+            // Determine label badge color based on source
+            let labelBadge = '';
+            if (labelSource === 'name_mentioned') {
+                labelBadge = `<span class="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Name</span>`;
+            } else if (labelSource === 'barcode_scan') {
+                labelBadge = `<span class="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded">Barcode</span>`;
+            }
+            
+            return `
+            <div class="speaker-box bg-[#111] rounded-xl overflow-hidden border border-[#1a1a1a] hover:border-[#333] transition-all" data-testid="speaker-box-${idx}">
+                <!-- Speaker Header -->
+                <div class="p-4 border-b border-[#1a1a1a] ${isHost ? 'bg-gradient-to-r from-[#8B5CF6]/20 to-transparent' : ''}">
+                    <div class="flex items-start justify-between">
+                        <div class="flex items-center gap-3">
+                            <div class="w-10 h-10 rounded-full ${isHost ? 'bg-gradient-to-br from-[#8B5CF6] to-[#6366F1]' : 'bg-[#1a1a1a]'} flex items-center justify-center flex-shrink-0">
+                                ${isHost ? 
+                                    `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>` : 
+                                    `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`
+                                }
+                            </div>
+                            <div>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <span class="font-semibold text-white">${speaker.label || `Speaker ${idx + 1}`}</span>
+                                    ${isHost ? `<span class="text-xs px-2 py-0.5 bg-[#8B5CF6]/30 text-[#8B5CF6] rounded-full font-medium">HOST</span>` : ''}
+                                    ${labelBadge}
+                                </div>
+                                ${speaker.company ? `<div class="text-xs text-gray-400 mt-0.5">${speaker.company}${speaker.role ? ` • ${speaker.role}` : ''}</div>` : ''}
+                            </div>
+                        </div>
+                        <span class="text-xs px-2 py-1 rounded ${sentimentClass(speaker.sentiment)}">${speaker.sentiment || 'neutral'}</span>
+                    </div>
+                </div>
+                
+                <!-- Speaker Content -->
+                <div class="p-4 space-y-3">
+                    <!-- Topics -->
+                    ${speaker.topics_discussed && speaker.topics_discussed.length > 0 ? `
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1.5">Topics Discussed</div>
+                        <div class="flex flex-wrap gap-1.5">
+                            ${speaker.topics_discussed.slice(0, 4).map(t => `<span class="text-xs px-2 py-1 bg-[#1a1a1a] rounded text-gray-300">${t}</span>`).join('')}
+                        </div>
+                    </div>` : ''}
+                    
+                    <!-- Key Points -->
+                    ${speaker.key_points && speaker.key_points.length > 0 ? `
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1.5">Key Points</div>
+                        <ul class="text-sm text-gray-300 space-y-1">
+                            ${speaker.key_points.slice(0, 3).map(p => `<li class="flex items-start gap-2"><span class="text-[#8B5CF6] mt-1">•</span>${p}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                    
+                    <!-- Questions Asked -->
+                    ${speaker.questions_asked && speaker.questions_asked.length > 0 ? `
+                    <div>
+                        <div class="text-xs text-gray-500 mb-1.5">Questions Asked</div>
+                        <ul class="text-sm text-amber-300/80 space-y-1">
+                            ${speaker.questions_asked.slice(0, 2).map(q => `<li class="flex items-start gap-2"><span class="text-amber-400">?</span>${q}</li>`).join('')}
+                        </ul>
+                    </div>` : ''}
+                    
+                    <!-- Play Segment Button -->
+                    ${firstSegment ? `
+                    <button onclick="playVideo('${recordingId}','${boothName}',${firstSegment.start_time || 0})" class="w-full flex items-center justify-center gap-2 mt-3 px-4 py-2 bg-[#1a1a1a] hover:bg-[#222] rounded-lg text-sm text-white transition-colors group">
+                        <svg class="w-4 h-4 text-purple group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span>Play from ${firstSegment.timestamp_label || fmtDur(firstSegment.start_time)}</span>
+                    </button>` : ''}
+                </div>
+                
+                <!-- Expandable Dialogue -->
+                <div id="dialogue-${recordingId}-${idx}" class="hidden border-t border-[#1a1a1a]">
+                    <div class="p-4 bg-[#0a0a0a]">
+                        <div class="text-xs text-gray-500 mb-2">What they said:</div>
+                        <div class="space-y-2 max-h-40 overflow-y-auto">
+                            ${segments.map(seg => `
+                                <div class="text-sm text-gray-300 p-2 bg-[#111] rounded cursor-pointer hover:bg-[#1a1a1a]" onclick="playVideo('${recordingId}','${boothName}',${seg.start_time || 0})">
+                                    <span class="text-xs font-mono purple mr-2">${seg.timestamp_label || fmtDur(seg.start_time)}</span>
+                                    "${seg.content || ''}"
+                                </div>
+                            `).join('')}
+                        </div>
+                    </div>
+                </div>
+                
+                <!-- Toggle Dialogue Button -->
+                ${segments.length > 0 ? `
+                <button onclick="toggleDialogue('${recordingId}', ${idx})" class="w-full p-2 text-xs text-gray-500 hover:text-white hover:bg-[#1a1a1a] transition-colors flex items-center justify-center gap-1" data-testid="toggle-dialogue-btn">
+                    <span id="toggle-text-${recordingId}-${idx}">Show full dialogue</span>
+                    <svg id="toggle-icon-${recordingId}-${idx}" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
+                </button>` : ''}
+            </div>`;
+        }
+
+        function showDetailedInsights(recordingId) {
+            const speakersDiv = document.getElementById(`speakers-${recordingId}`);
+            if (speakersDiv) {
+                speakersDiv.classList.remove('hidden');
+                speakersDiv.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+            }
+        }
+
+        function hideDetailedInsights(recordingId) {
+            const speakersDiv = document.getElementById(`speakers-${recordingId}`);
+            if (speakersDiv) {
+                speakersDiv.classList.add('hidden');
+            }
+        }
+
+        function toggleDialogue(recordingId, speakerIdx) {
+            const dialogueDiv = document.getElementById(`dialogue-${recordingId}-${speakerIdx}`);
+            const toggleText = document.getElementById(`toggle-text-${recordingId}-${speakerIdx}`);
+            const toggleIcon = document.getElementById(`toggle-icon-${recordingId}-${speakerIdx}`);
+            
+            if (dialogueDiv) {
+                const isHidden = dialogueDiv.classList.contains('hidden');
+                dialogueDiv.classList.toggle('hidden');
+                
+                if (toggleText) {
+                    toggleText.textContent = isHidden ? 'Hide dialogue' : 'Show full dialogue';
+                }
+                if (toggleIcon) {
+                    toggleIcon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
+                }
+            }
         }
 
         function renderVisitors() {
