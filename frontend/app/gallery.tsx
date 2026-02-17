@@ -13,11 +13,31 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { File } from 'expo-file-system/next';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
-interface Recording {
+interface LocalRecording {
+  id: string;
+  localId: string;
+  videoPath: string | null;
+  audioPath: string | null;
+  barcodeScansList: BarcodeData[];
+  duration: number;
+  createdAt: string;
+  isUploaded: boolean;
+  boothName: string;
+  deviceId: string;
+}
+
+interface BarcodeData {
+  barcode_data: string;
+  video_timestamp: number;
+  frame_code: number;
+}
+
+interface CloudRecording {
   id: string;
   start_time: string;
   duration?: number;
@@ -31,14 +51,18 @@ interface Recording {
   host_identified?: boolean;
 }
 
+type CombinedRecording = (LocalRecording & { source: 'local' }) | (CloudRecording & { source: 'cloud' });
+
 export default function GalleryScreen() {
   const router = useRouter();
   const { width, height } = useWindowDimensions();
-  const [recordings, setRecordings] = useState<Recording[]>([]);
+  const [recordings, setRecordings] = useState<CombinedRecording[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [deviceId, setDeviceId] = useState<string | null>(null);
+  const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<'all' | 'local' | 'cloud'>('all');
 
   useEffect(() => { loadDevice(); }, []);
   useEffect(() => { if (deviceId) fetchRecordings(); }, [deviceId]);
@@ -50,8 +74,41 @@ export default function GalleryScreen() {
 
   const fetchRecordings = async () => {
     try {
-      const res = await axios.get(`${API_URL}/api/recordings`, { params: { device_id: deviceId } });
-      setRecordings(res.data);
+      // Get local recordings
+      const localRecordings = await getLocalRecordings();
+      
+      // Get cloud recordings
+      let cloudRecordings: CloudRecording[] = [];
+      try {
+        const res = await axios.get(`${API_URL}/api/recordings`, { params: { device_id: deviceId }, timeout: 10000 });
+        cloudRecordings = res.data;
+      } catch (e) {
+        console.log('Could not fetch cloud recordings:', e);
+      }
+
+      // Combine recordings
+      const combined: CombinedRecording[] = [];
+      
+      // Add local recordings (not uploaded)
+      for (const local of localRecordings) {
+        if (!local.isUploaded) {
+          combined.push({ ...local, source: 'local' as const });
+        }
+      }
+      
+      // Add cloud recordings
+      for (const cloud of cloudRecordings) {
+        combined.push({ ...cloud, source: 'cloud' as const });
+      }
+
+      // Sort by date (newest first)
+      combined.sort((a, b) => {
+        const dateA = a.source === 'local' ? new Date(a.createdAt).getTime() : new Date(a.start_time).getTime();
+        const dateB = b.source === 'local' ? new Date(b.createdAt).getTime() : new Date(b.start_time).getTime();
+        return dateB - dateA;
+      });
+
+      setRecordings(combined);
     } catch (e) {
       console.error('Fetch recordings error:', e);
     } finally {
@@ -60,20 +117,154 @@ export default function GalleryScreen() {
     }
   };
 
-  const handleDelete = (item: Recording) => {
+  const getLocalRecordings = async (): Promise<LocalRecording[]> => {
+    try {
+      const saved = await AsyncStorage.getItem('xow_local_recordings');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
+    }
+  };
+
+  const uploadToCloud = async (recording: LocalRecording) => {
+    if (!deviceId) return;
+    
+    setUploadingId(recording.localId);
+    
+    try {
+      // Create recording entry in backend
+      const res = await axios.post(`${API_URL}/api/recordings`, {
+        device_id: deviceId,
+        expo_name: 'Expo 2025',
+        booth_name: recording.boothName,
+      });
+      
+      const recordingId = res.data.id;
+
+      // Upload video if available
+      if (recording.videoPath) {
+        const videoFile = new File(recording.videoPath);
+        if (videoFile.exists) {
+          const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
+          const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
+          const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
+
+          const formData = new FormData();
+          formData.append('video', {
+            uri: recording.videoPath,
+            type: mimeType,
+            name: fileName,
+          } as any);
+          formData.append('chunk_index', '0');
+          formData.append('total_chunks', '1');
+
+          await axios.post(
+            `${API_URL}/api/recordings/${recordingId}/upload-video`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }
+          );
+        }
+      }
+
+      // Upload audio if available
+      if (recording.audioPath) {
+        const audioFile = new File(recording.audioPath);
+        if (audioFile.exists) {
+          const formData = new FormData();
+          formData.append('audio', {
+            uri: recording.audioPath,
+            type: 'audio/m4a',
+            name: 'recording.m4a',
+          } as any);
+
+          await axios.post(
+            `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+            formData,
+            { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 }
+          );
+        }
+      }
+
+      // Upload barcode scans
+      for (const scan of recording.barcodeScansList || []) {
+        try {
+          await axios.post(`${API_URL}/api/barcodes`, {
+            recording_id: recordingId,
+            barcode_data: scan.barcode_data,
+            video_timestamp: scan.video_timestamp,
+            frame_code: scan.frame_code,
+          });
+        } catch {}
+      }
+
+      // Mark recording complete
+      await axios.put(`${API_URL}/api/recordings/${recordingId}/complete`);
+
+      // Update local recording as uploaded
+      const localRecordings = await getLocalRecordings();
+      const idx = localRecordings.findIndex(r => r.localId === recording.localId);
+      if (idx !== -1) {
+        localRecordings[idx].id = recordingId;
+        localRecordings[idx].isUploaded = true;
+        await AsyncStorage.setItem('xow_local_recordings', JSON.stringify(localRecordings));
+      }
+
+      Alert.alert('Upload Complete', 'Recording uploaded to cloud successfully!');
+      fetchRecordings();
+    } catch (e: any) {
+      console.error('Upload error:', e);
+      Alert.alert('Upload Failed', e?.message || 'Failed to upload recording to cloud');
+    } finally {
+      setUploadingId(null);
+    }
+  };
+
+  const handleDelete = (item: CombinedRecording) => {
+    const isLocal = item.source === 'local';
+    const itemId = isLocal ? (item as LocalRecording).localId : item.id;
+    const dateStr = isLocal ? fmtDate((item as LocalRecording).createdAt) : fmtDate((item as CloudRecording).start_time);
+    
     Alert.alert(
       'Delete Recording',
-      `Delete recording from ${fmtDate(item.start_time)}?\n\nThis will remove all data including AI analysis.`,
+      `Delete ${isLocal ? 'local' : 'cloud'} recording from ${dateStr}?\n\n${isLocal ? 'This will remove the local files.' : 'This will remove all data including AI analysis.'}`,
       [
         { text: 'Cancel', style: 'cancel' },
         {
           text: 'Delete',
           style: 'destructive',
           onPress: async () => {
-            setDeletingId(item.id);
+            setDeletingId(itemId);
             try {
-              await axios.delete(`${API_URL}/api/recordings/${item.id}`);
-              setRecordings(prev => prev.filter(r => r.id !== item.id));
+              if (isLocal) {
+                // Delete local files
+                const localRec = item as LocalRecording;
+                if (localRec.videoPath) {
+                  try {
+                    const file = new File(localRec.videoPath);
+                    if (file.exists) await file.delete();
+                  } catch {}
+                }
+                if (localRec.audioPath) {
+                  try {
+                    const file = new File(localRec.audioPath);
+                    if (file.exists) await file.delete();
+                  } catch {}
+                }
+                
+                // Remove from local storage
+                const localRecordings = await getLocalRecordings();
+                const filtered = localRecordings.filter(r => r.localId !== localRec.localId);
+                await AsyncStorage.setItem('xow_local_recordings', JSON.stringify(filtered));
+              } else {
+                // Delete from cloud
+                await axios.delete(`${API_URL}/api/recordings/${item.id}`);
+              }
+              
+              setRecordings(prev => prev.filter(r => 
+                r.source === 'local' 
+                  ? (r as LocalRecording).localId !== itemId 
+                  : r.id !== itemId
+              ));
             } catch (e) {
               Alert.alert('Error', 'Failed to delete recording');
             } finally {
@@ -85,7 +276,7 @@ export default function GalleryScreen() {
     );
   };
 
-  const handleReprocess = async (item: Recording) => {
+  const handleReprocess = async (item: CloudRecording) => {
     try {
       await axios.post(`${API_URL}/api/recordings/${item.id}/reprocess`);
       Alert.alert('Reprocessing', 'AI analysis has started. Refresh to see results.');
@@ -105,6 +296,7 @@ export default function GalleryScreen() {
   const fmtDate = (d: string) => new Date(d).toLocaleDateString('en-US', { month: 'short', day: 'numeric', hour: '2-digit', minute: '2-digit' });
 
   const statusConfig: Record<string, { color: string; icon: string; label: string }> = {
+    local: { color: '#F59E0B', icon: 'save', label: 'Local' },
     recording: { color: '#EF4444', icon: 'radio-button-on', label: 'Recording' },
     completed: { color: '#F59E0B', icon: 'checkmark-circle', label: 'Completed' },
     uploaded: { color: '#3B82F6', icon: 'cloud-done', label: 'Uploaded' },
@@ -113,34 +305,68 @@ export default function GalleryScreen() {
     error: { color: '#EF4444', icon: 'alert-circle', label: 'Error' },
   };
 
-  const getStatusConfig = (status: string) => statusConfig[status] || { color: '#666', icon: 'help-circle', label: status };
+  const getStatusConfig = (item: CombinedRecording) => {
+    if (item.source === 'local') return statusConfig.local;
+    return statusConfig[(item as CloudRecording).status] || { color: '#666', icon: 'help-circle', label: 'Unknown' };
+  };
+
+  const filterRecordings = (items: CombinedRecording[]) => {
+    if (viewMode === 'all') return items;
+    if (viewMode === 'local') return items.filter(r => r.source === 'local');
+    return items.filter(r => r.source === 'cloud');
+  };
 
   const sidebarWidth = Math.min(90, width * 0.12);
 
-  const renderItem = ({ item }: { item: Recording }) => {
-    const config = getStatusConfig(item.status);
-    const summaryText = item.overall_summary || item.summary;
+  const renderItem = ({ item }: { item: CombinedRecording }) => {
+    const config = getStatusConfig(item);
+    const isLocal = item.source === 'local';
+    const localItem = item as LocalRecording;
+    const cloudItem = item as CloudRecording;
+    const itemId = isLocal ? localItem.localId : item.id;
+    const dateStr = isLocal ? localItem.createdAt : cloudItem.start_time;
+    const duration = isLocal ? localItem.duration : cloudItem.duration;
+    const hasVideo = isLocal ? !!localItem.videoPath : cloudItem.has_video;
+    const hasAudio = isLocal ? !!localItem.audioPath : cloudItem.has_audio;
+    const barcodeCount = isLocal ? (localItem.barcodeScansList?.length || 0) : (cloudItem.barcode_scans?.length || 0);
+    const summaryText = !isLocal ? (cloudItem.overall_summary || cloudItem.summary) : null;
 
     return (
       <View style={styles.card}>
         {/* Header Row */}
         <View style={styles.cardHeader}>
           <View style={styles.dateSection}>
-            <Text style={styles.cardDate}>{fmtDate(item.start_time)}</Text>
-            <Text style={styles.cardDuration}>{fmtDur(item.duration)}</Text>
+            <Text style={styles.cardDate}>{fmtDate(dateStr)}</Text>
+            <Text style={styles.cardDuration}>{fmtDur(duration)}</Text>
           </View>
           <View style={styles.cardActions}>
-            {item.status === 'error' && (
-              <TouchableOpacity style={styles.reprocessBtn} onPress={() => handleReprocess(item)}>
+            {!isLocal && cloudItem.status === 'error' && (
+              <TouchableOpacity style={styles.reprocessBtn} onPress={() => handleReprocess(cloudItem)}>
                 <Ionicons name="refresh" size={12} color="#F59E0B" />
+              </TouchableOpacity>
+            )}
+            {isLocal && (
+              <TouchableOpacity
+                style={styles.uploadBtn}
+                onPress={() => uploadToCloud(localItem)}
+                disabled={uploadingId === localItem.localId}
+              >
+                {uploadingId === localItem.localId ? (
+                  <ActivityIndicator size="small" color="#10B981" />
+                ) : (
+                  <>
+                    <Ionicons name="cloud-upload" size={14} color="#10B981" />
+                    <Text style={styles.uploadBtnText}>Upload</Text>
+                  </>
+                )}
               </TouchableOpacity>
             )}
             <TouchableOpacity
               style={styles.deleteBtn}
               onPress={() => handleDelete(item)}
-              disabled={deletingId === item.id}
+              disabled={deletingId === itemId}
             >
-              {deletingId === item.id ? (
+              {deletingId === itemId ? (
                 <ActivityIndicator size="small" color="#EF4444" />
               ) : (
                 <Ionicons name="trash" size={14} color="#EF4444" />
@@ -152,11 +378,11 @@ export default function GalleryScreen() {
         {/* Media & Status Row */}
         <View style={styles.mediaRow}>
           <View style={styles.mediaIcons}>
-            <View style={[styles.mediaBadge, item.has_video && styles.mediaBadgeActive]}>
-              <Ionicons name="videocam" size={10} color={item.has_video ? '#10B981' : '#444'} />
+            <View style={[styles.mediaBadge, hasVideo && styles.mediaBadgeActive]}>
+              <Ionicons name="videocam" size={10} color={hasVideo ? '#10B981' : '#444'} />
             </View>
-            <View style={[styles.mediaBadge, item.has_audio && styles.mediaBadgeActive]}>
-              <Ionicons name="mic" size={10} color={item.has_audio ? '#10B981' : '#444'} />
+            <View style={[styles.mediaBadge, hasAudio && styles.mediaBadgeActive]}>
+              <Ionicons name="mic" size={10} color={hasAudio ? '#10B981' : '#444'} />
             </View>
           </View>
           <View style={[styles.statusBadge, { backgroundColor: `${config.color}20` }]}>
@@ -169,22 +395,27 @@ export default function GalleryScreen() {
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Ionicons name="people" size={12} color="#8B5CF6" />
-            <Text style={styles.statText}>{item.barcode_scans?.length || 0} visitors</Text>
+            <Text style={styles.statText}>{barcodeCount} visitors</Text>
           </View>
-          {item.total_speakers && item.total_speakers > 0 && (
+          {!isLocal && cloudItem.total_speakers && cloudItem.total_speakers > 0 && (
             <View style={styles.stat}>
               <Ionicons name="chatbubbles" size={12} color="#10B981" />
-              <Text style={styles.statText}>{item.total_speakers} speakers</Text>
+              <Text style={styles.statText}>{cloudItem.total_speakers} speakers</Text>
             </View>
           )}
-          {item.host_identified && (
+          {!isLocal && cloudItem.host_identified && (
             <View style={styles.hostBadge}>
               <Text style={styles.hostText}>HOST ID</Text>
             </View>
           )}
+          {isLocal && (
+            <View style={styles.localBadge}>
+              <Text style={styles.localBadgeText}>NOT UPLOADED</Text>
+            </View>
+          )}
         </View>
 
-        {/* Summary */}
+        {/* Summary (cloud only) */}
         {summaryText && (
           <View style={styles.summarySection}>
             <Ionicons name="sparkles" size={10} color="#8B5CF6" />
@@ -195,8 +426,14 @@ export default function GalleryScreen() {
     );
   };
 
-  const processedCount = recordings.filter(r => r.status === 'processed').length;
-  const totalDuration = recordings.reduce((acc, r) => acc + (r.duration || 0), 0);
+  const filteredRecordings = filterRecordings(recordings);
+  const localCount = recordings.filter(r => r.source === 'local').length;
+  const cloudCount = recordings.filter(r => r.source === 'cloud').length;
+  const processedCount = recordings.filter(r => r.source === 'cloud' && (r as CloudRecording).status === 'processed').length;
+  const totalDuration = recordings.reduce((acc, r) => {
+    const dur = r.source === 'local' ? (r as LocalRecording).duration : ((r as CloudRecording).duration || 0);
+    return acc + dur;
+  }, 0);
 
   return (
     <View style={[styles.container, { width, height }]}>
@@ -212,11 +449,15 @@ export default function GalleryScreen() {
             <Text style={styles.sideStatLabel}>Total</Text>
           </View>
           <View style={styles.sideStat}>
-            <Text style={[styles.sideStatNum, { color: '#10B981' }]}>{processedCount}</Text>
-            <Text style={styles.sideStatLabel}>AI Ready</Text>
+            <Text style={[styles.sideStatNum, { color: '#F59E0B' }]}>{localCount}</Text>
+            <Text style={styles.sideStatLabel}>Local</Text>
           </View>
           <View style={styles.sideStat}>
-            <Text style={[styles.sideStatNum, { color: '#F59E0B', fontSize: 14 }]}>{fmtDur(totalDuration)}</Text>
+            <Text style={[styles.sideStatNum, { color: '#10B981' }]}>{cloudCount}</Text>
+            <Text style={styles.sideStatLabel}>Cloud</Text>
+          </View>
+          <View style={styles.sideStat}>
+            <Text style={[styles.sideStatNum, { color: '#8B5CF6', fontSize: 14 }]}>{fmtDur(totalDuration)}</Text>
             <Text style={styles.sideStatLabel}>Duration</Text>
           </View>
         </View>
@@ -230,7 +471,31 @@ export default function GalleryScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Recordings</Text>
-          <Text style={styles.headerSub}>View and manage your booth recordings</Text>
+          <Text style={styles.headerSub}>View, manage and upload your recordings</Text>
+        </View>
+
+        {/* Filter Tabs */}
+        <View style={styles.filterTabs}>
+          <TouchableOpacity
+            style={[styles.filterTab, viewMode === 'all' && styles.filterTabActive]}
+            onPress={() => setViewMode('all')}
+          >
+            <Text style={[styles.filterTabText, viewMode === 'all' && styles.filterTabTextActive]}>All ({recordings.length})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterTab, viewMode === 'local' && styles.filterTabActive]}
+            onPress={() => setViewMode('local')}
+          >
+            <Ionicons name="save" size={12} color={viewMode === 'local' ? '#8B5CF6' : '#666'} />
+            <Text style={[styles.filterTabText, viewMode === 'local' && styles.filterTabTextActive]}>Local ({localCount})</Text>
+          </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.filterTab, viewMode === 'cloud' && styles.filterTabActive]}
+            onPress={() => setViewMode('cloud')}
+          >
+            <Ionicons name="cloud" size={12} color={viewMode === 'cloud' ? '#8B5CF6' : '#666'} />
+            <Text style={[styles.filterTabText, viewMode === 'cloud' && styles.filterTabTextActive]}>Cloud ({cloudCount})</Text>
+          </TouchableOpacity>
         </View>
 
         {isLoading ? (
@@ -238,13 +503,21 @@ export default function GalleryScreen() {
             <ActivityIndicator color="#8B5CF6" size="large" />
             <Text style={styles.loadingText}>Loading recordings...</Text>
           </View>
-        ) : recordings.length === 0 ? (
+        ) : filteredRecordings.length === 0 ? (
           <View style={styles.center}>
             <View style={styles.emptyIcon}>
               <Ionicons name="videocam-off" size={40} color="#333" />
             </View>
-            <Text style={styles.emptyTitle}>No Recordings Yet</Text>
-            <Text style={styles.emptyText}>Start recording to capture booth conversations</Text>
+            <Text style={styles.emptyTitle}>
+              {viewMode === 'local' ? 'No Local Recordings' : viewMode === 'cloud' ? 'No Cloud Recordings' : 'No Recordings Yet'}
+            </Text>
+            <Text style={styles.emptyText}>
+              {viewMode === 'local' 
+                ? 'Local recordings will appear here after recording'
+                : viewMode === 'cloud'
+                  ? 'Upload local recordings to see them in the cloud'
+                  : 'Start recording to capture booth conversations'}
+            </Text>
             <TouchableOpacity style={styles.emptyBtn} onPress={() => router.back()}>
               <Ionicons name="videocam" size={16} color="#fff" />
               <Text style={styles.emptyBtnText}>Start Recording</Text>
@@ -252,9 +525,9 @@ export default function GalleryScreen() {
           </View>
         ) : (
           <FlatList
-            data={recordings}
+            data={filteredRecordings}
             renderItem={renderItem}
-            keyExtractor={item => item.id}
+            keyExtractor={item => item.source === 'local' ? (item as LocalRecording).localId : item.id}
             contentContainerStyle={styles.list}
             refreshControl={
               <RefreshControl
@@ -277,9 +550,9 @@ const styles = StyleSheet.create({
   // Sidebar
   sidebar: { backgroundColor: '#0a0a0a', borderRightWidth: 1, borderRightColor: '#1a1a1a', padding: 10, alignItems: 'center', justifyContent: 'space-between' },
   backBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
-  sideStats: { alignItems: 'center', gap: 16 },
+  sideStats: { alignItems: 'center', gap: 14 },
   sideStat: { alignItems: 'center' },
-  sideStatNum: { color: '#8B5CF6', fontSize: 20, fontWeight: '800' },
+  sideStatNum: { color: '#8B5CF6', fontSize: 18, fontWeight: '800' },
   sideStatLabel: { color: '#555', fontSize: 8, marginTop: 2 },
   refreshBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
 
@@ -289,13 +562,20 @@ const styles = StyleSheet.create({
   headerTitle: { color: '#fff', fontSize: 16, fontWeight: '700' },
   headerSub: { color: '#555', fontSize: 10, marginTop: 2 },
 
+  // Filter Tabs
+  filterTabs: { flexDirection: 'row', padding: 8, gap: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  filterTab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#111' },
+  filterTabActive: { backgroundColor: 'rgba(139,92,246,0.2)', borderWidth: 1, borderColor: '#8B5CF6' },
+  filterTabText: { color: '#666', fontSize: 11, fontWeight: '500' },
+  filterTabTextActive: { color: '#8B5CF6' },
+
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   loadingText: { color: '#555', fontSize: 12, marginTop: 12 },
 
   // Empty State
   emptyIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
-  emptyText: { color: '#555', fontSize: 12, marginTop: 4, textAlign: 'center' },
+  emptyText: { color: '#555', fontSize: 12, marginTop: 4, textAlign: 'center', maxWidth: 250 },
   emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#8B5CF6', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, marginTop: 20 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
@@ -310,6 +590,8 @@ const styles = StyleSheet.create({
   cardDuration: { color: '#666', fontSize: 10, marginTop: 2 },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
   reprocessBtn: { padding: 6, backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 4 },
+  uploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 4 },
+  uploadBtnText: { color: '#10B981', fontSize: 10, fontWeight: '600' },
   deleteBtn: { padding: 6 },
 
   // Media Row
@@ -321,11 +603,13 @@ const styles = StyleSheet.create({
   statusText: { fontSize: 9, fontWeight: '600' },
 
   // Stats Row
-  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  statsRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginBottom: 8, flexWrap: 'wrap' },
   stat: { flexDirection: 'row', alignItems: 'center', gap: 4 },
   statText: { color: '#888', fontSize: 10 },
   hostBadge: { backgroundColor: 'rgba(16,185,129,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 },
   hostText: { color: '#10B981', fontSize: 8, fontWeight: '700' },
+  localBadge: { backgroundColor: 'rgba(245,158,11,0.2)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 3 },
+  localBadgeText: { color: '#F59E0B', fontSize: 8, fontWeight: '700' },
 
   // Summary
   summarySection: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
