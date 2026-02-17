@@ -195,6 +195,7 @@ export default function RecorderScreen() {
 
       // Start audio recording
       try {
+        await audioRecorder.prepareToRecordAsync();
         audioRecorder.record();
         console.log('Audio recording started');
       } catch (audioErr: any) {
