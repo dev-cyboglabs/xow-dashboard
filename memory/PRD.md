@@ -1,188 +1,132 @@
-# XoW - Expo Stall Recording & Analysis System
+# XoW - Expo Stall Recording System
 
-## Product Overview
-XoW is a system for expo booths that records conversations and uses AI to analyze them. It consists of:
-- **Android App**: For recording video/audio at expo booths
-- **Web Dashboard**: For analyzing recordings with AI-powered insights
+## Original Problem Statement
+Build a system named "XoW" for expo stalls. The core functionality involves recording video/audio via a mobile app and analyzing it on a web dashboard.
 
-## Core Features Implemented
+## User Requirements (Latest - Feb 17, 2026)
 
-### 1. Dashboard Authentication (Completed Feb 17, 2026)
-- **Home Page** at `/api/home` with landing page design
-- **Login/Signup** modals with email/password authentication
-- User session stored in localStorage for persistence
-- Redirect to dashboard after successful login
+### Mobile App Requirements
+1. **Local Storage First**: Don't auto-upload to cloud after recording
+2. **Manual Upload**: Add "Upload to Cloud" button with manual control
+3. **Storage Settings**: Option to choose storage location (internal/external/documents)
+4. **Barcode Integration**: Upload barcode data along with recordings, correlate in cloud
 
-### 2. Device Management with OTP (Completed Feb 17, 2026)
-- **6-digit static device code** generated for each mobile app
-- **8-digit OTP** generated when dashboard user adds a device
-- OTP expires in 10 minutes
-- **Maximum 10 devices** per dashboard account
-- Device association flow:
-  1. Mobile app shows 6-digit code
-  2. Dashboard user enters code, gets 8-digit OTP
-  3. User enters OTP in mobile app to complete association
-- Devices can be removed from dashboard
+### Dashboard Requirements
+1. **Video Timestamp Seeking**: Click on speaker/topic segments to jump to that timestamp
+2. **Colorful Professional Design**: More vibrant than purple theme (currently implementing)
+3. **Visitor Badges**: Display conversation summaries with visitor info
+4. **Session Summaries**: Overview of video with key topics and customer questions
 
-### 3. Bright Theme Dashboard (Completed Feb 17, 2026)
-- Clean white/slate background (rgb(248, 250, 252))
-- Violet/purple accent colors
-- Glass-morphism effects on cards
-- Modern, PLAUD-inspired design
-- Sidebar navigation with Overview, Sessions, Visitors, Devices tabs
+## What's Been Implemented
 
-### 4. Video Playback Fixed (Completed Feb 17, 2026)
-- Videos now properly upload and play in dashboard
-- Video streaming with correct MIME types (MP4, WebM, MOV)
-- Range request support for seeking
-- "Play Video" button shown for video recordings
-- "Play Audio" button for audio-only recordings
-- Video modal with player controls
+### Backend (FastAPI + MongoDB)
+- ✅ User authentication (login/signup)
+- ✅ Device management with OTP verification
+- ✅ Recording CRUD operations
+- ✅ Video/Audio file upload with GridFS storage
+- ✅ **NEW**: Video remuxing with `+faststart` flag for web seeking
+- ✅ Audio extraction from video using FFmpeg
+- ✅ OpenAI Whisper transcription
+- ✅ GPT-4 conversation analysis (speakers, topics, summaries)
+- ✅ Barcode scanning data storage
+- ✅ Dashboard data APIs (insights, recordings, visitors)
+- ✅ **FIXED**: MongoDB ObjectId serialization (recursive serialize_value function)
+- ✅ **FIXED**: None duration handling in insights aggregation
 
-### 4. Automatic Transcription (Completed Dec 15, 2025)
-- Audio files uploaded to backend are automatically transcribed using OpenAI Whisper API
-- Transcription triggers automatically when audio is uploaded via `/api/recordings/{id}/upload-audio`
-- Falls back to manual transcript entry if needed
+### Frontend - Mobile App (React Native/Expo)
+- ✅ Device registration and OTP verification
+- ✅ Video/audio recording with camera
+- ✅ **NEW**: Local storage with manual cloud upload (recorder.tsx, gallery.tsx)
+- ✅ **NEW**: Storage location settings (settings.tsx)
+- ✅ Barcode scanning during recording
+- ✅ Gallery view with local/cloud recordings
+- ✅ Upload progress tracking
 
-### 5. AI Speaker Diarization (Completed Dec 15, 2025)
-Using OpenAI Whisper + GPT-4o for accurate speaker separation:
-
-**Features:**
-- Separates conversations by speaker
-- Identifies recurring "host" voice (booth staff) vs guests
-- Labels speakers with:
-  - Their actual name if mentioned in conversation
-  - Barcode ID if scanned during their speaking segment
-  - Auto-generated labels (Guest 1, Guest 2) as fallback
-- Extracts per-speaker data:
-  - Company/organization
-  - Role
-  - Topics discussed
-  - Key points
-  - Questions asked
-  - Sentiment (positive, interested, neutral, skeptical)
-  - Dialogue segments with timestamps
-
-### 6. PLAUD-Style Dashboard UI (Completed Dec 15, 2025)
-**Overall Summary Section:**
-- High-level conversation summary
-- Main topics as pills/tags
-- Host identified badge
-- Follow-up actions list
-
-**Detailed Insights Button:**
-- Expands to show speaker boxes
-- Each speaker box contains:
-  - Avatar with HOST badge if applicable
-  - Name/label with source indicator (Name, Barcode)
-  - Company and role
-  - Sentiment badge
-  - Topics discussed
-  - Key points extracted
-  - Questions asked
-  - Play button to jump to their speaking segment
-  - Expandable full dialogue view
-
-### 7. Video/Audio Playback with Timestamp Jumping
-- Click any speaker's Play button to jump to their segment
-- Click conversation cards to play from that timestamp
-- Works with both video and audio-only recordings
-- Download fallback for unsupported audio codecs
-
-## Tech Stack
-- **Frontend**: React Native (Expo) for mobile, HTML/JS/Tailwind for web dashboard
-- **Backend**: FastAPI with Python
-- **Database**: MongoDB with GridFS for file storage
-- **AI**: OpenAI API (Whisper for transcription, GPT for analysis)
+### Frontend - Web Dashboard
+- ✅ Landing page with product info
+- ✅ Login/signup authentication
+- ✅ Overview with stats (sessions, visitors, duration, AI processed)
+- ✅ Sessions list with AI summaries
+- ✅ Audio/video playback modal
+- ✅ Transcript display with translation
+- ✅ Device management panel
+- ✅ Visitors listing
 
 ## API Endpoints
 
-### Dashboard Auth
-- `POST /api/dashboard/auth/signup` - Create new dashboard user
-- `POST /api/dashboard/auth/login` - Login dashboard user
-- `GET /api/dashboard/auth/user/{user_id}` - Get user details
+### Authentication
+- `POST /api/dashboard/auth/signup` - Create account
+- `POST /api/dashboard/auth/login` - Login
 
-### Device Management
-- `POST /api/mobile/register-device` - Register mobile device, get 6-digit code
-- `POST /api/dashboard/devices/add` - Add device to dashboard, get 8-digit OTP
-- `POST /api/mobile/verify-otp` - Verify OTP from mobile app
-- `GET /api/dashboard/devices/{user_id}` - Get user's devices
-- `DELETE /api/dashboard/devices/{user_id}/{device_code}` - Remove device
+### Dashboard Data
+- `GET /api/dashboard/insights` - Aggregated stats
+- `GET /api/dashboard/recordings` - All recordings with details
+- `GET /api/dashboard/visitors` - Visitor badges
 
 ### Recordings
-- `GET /api/dashboard` - Serve dashboard HTML
-- `GET /api/home` - Serve home/landing page HTML
-- `GET /api/dashboard/recordings` - Get all recordings
-- `GET /api/dashboard/insights` - Get dashboard stats
-- `GET /api/recordings/{id}/audio` - Stream audio
+- `POST /api/recordings` - Create recording
+- `GET /api/recordings` - List recordings
+- `POST /api/recordings/{id}/upload-video` - Upload video (remuxed with faststart)
+- `POST /api/recordings/{id}/upload-audio` - Upload audio
 - `GET /api/recordings/{id}/video` - Stream video
-- `POST /api/recordings/{id}/translate` - Translate transcript
+- `GET /api/recordings/{id}/audio` - Stream audio
 
-## Database Schema
+### Device Management
+- `POST /api/mobile/register-device` - Register mobile device
+- `POST /api/mobile/verify-otp` - Verify OTP
 
-### dashboard_users
-```json
-{
-  "email": "string",
-  "password_hash": "string",
-  "name": "string",
-  "created_at": "datetime",
-  "devices": ["string"], // array of device codes
-  "is_active": true
-}
+## Test Results (Feb 17, 2026)
+- **Backend**: 100% (13/13 tests passed)
+- **Frontend**: 100% pass rate
+- All dashboard APIs working correctly
+- Login/signup flow verified
+- Video upload accepting files
+
+## Files Structure
+```
+/app
+├── backend/
+│   ├── static/
+│   │   ├── dashboard.html, dashboard.css (main dashboard)
+│   │   ├── auth.html (login/signup)
+│   │   └── home.html (landing page)
+│   ├── tests/
+│   │   └── test_dashboard_api.py
+│   ├── .env (MONGO_URL, OPENAI_API_KEY)
+│   ├── requirements.txt
+│   └── server.py
+├── frontend/
+│   ├── app/
+│   │   ├── index.tsx (device registration)
+│   │   ├── recorder.tsx (camera + local save)
+│   │   ├── gallery.tsx (recordings + cloud upload)
+│   │   └── settings.tsx (storage preferences)
+│   ├── .env (EXPO_PUBLIC_BACKEND_URL)
+│   └── package.json
+├── test_reports/
+│   ├── iteration_3.json
+│   └── iteration_4.json
+└── memory/
+    └── PRD.md
 ```
 
-### mobile_devices
-```json
-{
-  "device_code": "string", // 6-digit
-  "device_name": "string",
-  "created_at": "datetime",
-  "dashboard_user_id": "string", // null if not associated
-  "associated_at": "datetime",
-  "pending_otp": "string", // 8-digit, cleared after verification
-  "otp_expiry": "datetime"
-}
-```
+## Upcoming Tasks (Prioritized)
 
-### recordings
-```json
-{
-  "device_id": "string",
-  "booth_name": "string",
-  "start_time": "datetime",
-  "duration": "number",
-  "has_video": true,
-  "has_audio": true,
-  "video_url": "string",
-  "audio_url": "string",
-  "status": "uploaded|processing|processed|error",
-  "transcript": "string",
-  "summary": "string",
-  "speakers": [{ ... }],
-  "conversations": [{ ... }]
-}
-```
+### P0 - Critical
+1. ~~Fix iOS video uploads~~ ✅ Refactored with expo-file-system/next
+2. ~~Fix backend serialization~~ ✅ serialize_value handles nested objects
+3. Test video timestamp seeking on dashboard with uploaded video
 
-## Environment Variables
+### P1 - Important  
+4. Android recording notice (development build required for video)
+5. Verify transcription saves to DB correctly
+6. Colorful dashboard redesign
 
-### Backend (.env)
-- `MONGO_URL` - MongoDB connection string
-- `DB_NAME` - Database name
-- `OPENAI_API_KEY` - OpenAI API key for Whisper and GPT
+### P2 - Features
+7. Visitor badge UI on dashboard
+8. Session summaries with key topics
+9. Barcode-to-visitor correlation
 
-## Test Credentials
-- **Dashboard User**: test@example.com / password123
-- **User ID**: 69946b3d5920418d9da30fc7
-- **Test Device Code**: 416100
-
-## Upcoming Tasks (P2)
-1. Update mobile app to show device code and OTP entry screen
-2. Re-enable automatic transcription on file upload
-3. Video overlays (timestamp, watermark, branding)
-
-## Future Tasks (P3)
-1. Refactor server.py into separate modules
-2. Break down frontend/app/index.tsx into components
-3. Add email verification for signup
-4. Add password reset flow
+## Known Limitations
+- Video recording requires Expo development build on Android (Expo Go doesn't support)
+- Audio playback fallback to Download button in some browsers
