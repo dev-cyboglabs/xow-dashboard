@@ -1111,28 +1111,74 @@ async def upload_audio(recording_id: str, audio: UploadFile = File(...), backgro
         raise HTTPException(status_code=400, detail=str(e))
 
 @api_router.get("/recordings/{recording_id}/video")
-async def get_video(recording_id: str):
-    """Stream video file"""
+async def get_video(recording_id: str, request: Request):
+    """Stream video file with proper MIME type and range support"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording or not recording.get('video_file_id'):
             raise HTTPException(status_code=404, detail="Video not found")
         
+        # Get file info for size and metadata
+        file_info = await db.fs.files.find_one({"_id": ObjectId(recording['video_file_id'])})
+        file_size = file_info.get('length', 0) if file_info else 0
+        
+        # Get MIME type from recording or file metadata
+        mime_type = recording.get('video_mime_type')
+        if not mime_type and file_info:
+            mime_type = file_info.get('metadata', {}).get('mime_type', 'video/mp4')
+        if not mime_type:
+            mime_type = 'video/mp4'  # Default
+        
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['video_file_id']))
         
-        async def stream_video():
-            while True:
-                chunk = await grid_out.read(1024 * 1024)  # 1MB chunks
-                if not chunk:
-                    break
-                yield chunk
+        # Check for Range header for seeking support
+        range_header = request.headers.get('range')
         
-        return StreamingResponse(
-            stream_video(),
-            media_type="video/webm",
-            headers={"Content-Disposition": f"inline; filename=video_{recording_id}.webm"}
-        )
+        if range_header and file_size > 0:
+            # Parse range header
+            range_match = range_header.replace('bytes=', '').split('-')
+            start = int(range_match[0]) if range_match[0] else 0
+            end = int(range_match[1]) if len(range_match) > 1 and range_match[1] else file_size - 1
+            
+            # Ensure valid range
+            start = max(0, min(start, file_size - 1))
+            end = max(start, min(end, file_size - 1))
+            
+            # Seek to start position
+            await grid_out.seek(start)
+            content_length = end - start + 1
+            
+            # Read the requested range
+            content = await grid_out.read(content_length)
+            
+            return Response(
+                content=content,
+                status_code=206,
+                media_type=mime_type,
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length),
+                    "Content-Disposition": f"inline; filename=video_{recording_id}.mp4"
+                }
+            )
+        else:
+            # No range requested - stream entire file
+            content = await grid_out.read()
+            
+            return Response(
+                content=content,
+                media_type=mime_type,
+                headers={
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(file_size),
+                    "Content-Disposition": f"inline; filename=video_{recording_id}.mp4"
+                }
+            )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Video streaming error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @api_router.get("/recordings/{recording_id}/audio")
