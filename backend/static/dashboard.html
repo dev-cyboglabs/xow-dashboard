@@ -8,24 +8,30 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
-        body { background: #F8FAFC; }
+        body { background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); }
         .card { background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
-        .purple { color: #7C3AED; }
-        .bg-purple { background: #7C3AED; }
         .fade { animation: fade 0.3s ease; }
         @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .loading { animation: pulse 1.5s infinite; }
         .nav-btn { transition: all 0.2s ease; }
         .nav-btn:hover { background: #F1F5F9; }
-        .nav-btn.active { background: #EDE9FE; color: #7C3AED; font-weight: 500; }
+        .nav-btn.active { background: linear-gradient(135deg, #EDE9FE, #DBEAFE); color: #6366F1; font-weight: 500; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #F1F5F9; }
         ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
         .speaker-box { transition: all 0.2s ease; }
-        .speaker-box:hover { border-color: #7C3AED; transform: translateY(-2px); }
+        .speaker-box:hover { border-color: #6366F1; transform: translateY(-2px); }
+        /* Color palette */
+        .gradient-purple { background: linear-gradient(135deg, #8B5CF6, #6366F1); }
+        .gradient-blue { background: linear-gradient(135deg, #3B82F6, #06B6D4); }
+        .gradient-green { background: linear-gradient(135deg, #10B981, #14B8A6); }
+        .gradient-orange { background: linear-gradient(135deg, #F59E0B, #EF4444); }
+        .gradient-pink { background: linear-gradient(135deg, #EC4899, #8B5CF6); }
+        .visitor-badge { transition: all 0.3s ease; }
+        .visitor-badge:hover { transform: scale(1.02); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
     </style>
 </head>
 <body class="min-h-screen text-gray-900">
