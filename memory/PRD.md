@@ -31,6 +31,14 @@ XoW is a system for expo booths that records conversations and uses AI to analyz
 - Modern, PLAUD-inspired design
 - Sidebar navigation with Overview, Sessions, Visitors, Devices tabs
 
+### 4. Video Playback Fixed (Completed Feb 17, 2026)
+- Videos now properly upload and play in dashboard
+- Video streaming with correct MIME types (MP4, WebM, MOV)
+- Range request support for seeking
+- "Play Video" button shown for video recordings
+- "Play Audio" button for audio-only recordings
+- Video modal with player controls
+
 ### 4. Automatic Transcription (Completed Dec 15, 2025)
 - Audio files uploaded to backend are automatically transcribed using OpenAI Whisper API
 - Transcription triggers automatically when audio is uploaded via `/api/recordings/{id}/upload-audio`
