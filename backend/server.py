@@ -95,16 +95,28 @@ class VisitorBadge(BaseModel):
     is_barcode_linked: bool = False
 
 # Helper function to serialize MongoDB documents
+def serialize_value(value):
+    """Recursively serialize MongoDB types to JSON-compatible types"""
+    if isinstance(value, ObjectId):
+        return str(value)
+    elif isinstance(value, datetime):
+        return value.isoformat()
+    elif isinstance(value, dict):
+        return {k: serialize_value(v) for k, v in value.items()}
+    elif isinstance(value, list):
+        return [serialize_value(item) for item in value]
+    return value
+
 def serialize_doc(doc):
     if doc is None:
         return None
-    doc['id'] = str(doc.pop('_id'))
+    result = {}
     for key, value in doc.items():
-        if isinstance(value, ObjectId):
-            doc[key] = str(value)
-        elif isinstance(value, datetime):
-            doc[key] = value.isoformat()
-    return doc
+        if key == '_id':
+            result['id'] = str(value)
+        else:
+            result[key] = serialize_value(value)
+    return result
 
 # Extract audio from video using ffmpeg
 async def extract_audio_from_video(video_data: bytes, video_format: str = "mp4") -> bytes:
