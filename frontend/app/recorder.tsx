@@ -20,14 +20,6 @@ import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
 
-// Helper to get document directory path as string
-const getDocDir = (): string => {
-  // FileSystem.documentDirectory can be string or null
-  const dir = FileSystem.documentDirectory;
-  if (typeof dir === 'string') return dir;
-  return '';
-};
-
 interface Device {
   id: string;
   device_id: string;
