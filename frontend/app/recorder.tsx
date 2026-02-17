@@ -284,71 +284,98 @@ export default function RecorderScreen() {
   };
 
   const uploadVideo = async (recordingId: string, uri: string) => {
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (!fileInfo.exists) {
-      console.log('Video file does not exist:', uri);
-      throw new Error('Video file not found');
-    }
-    
-    console.log('Video file info:', JSON.stringify(fileInfo));
-    
-    // Determine file type based on URI
-    const isMovFile = uri.toLowerCase().endsWith('.mov');
-    const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
-    const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
-
-    const formData = new FormData();
-    formData.append('video', {
-      uri,
-      type: mimeType,
-      name: fileName,
-    } as any);
-    formData.append('chunk_index', '0');
-    formData.append('total_chunks', '1');
-
-    console.log('Uploading video:', { recordingId, uri, mimeType, fileName });
-    
-    const response = await axios.post(
-      `${API_URL}/api/recordings/${recordingId}/upload-video`,
-      formData,
-      {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 300000, // 5 min timeout
-        onUploadProgress: (progressEvent) => {
-          const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
-          console.log('Video upload progress:', progress.toFixed(1) + '%');
-        }
+    try {
+      // Use new File API
+      const file = new File(uri);
+      const exists = file.exists;
+      
+      if (!exists) {
+        console.log('Video file does not exist:', uri);
+        throw new Error('Video file not found');
       }
-    );
-    
-    console.log('Video upload response:', response.data);
-    return response.data;
+      
+      const fileSize = file.size || 0;
+      console.log('Video file size:', fileSize);
+      
+      // Determine file type based on URI
+      const isMovFile = uri.toLowerCase().endsWith('.mov');
+      const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
+      const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
+
+      const formData = new FormData();
+      formData.append('video', {
+        uri,
+        type: mimeType,
+        name: fileName,
+      } as any);
+      formData.append('chunk_index', '0');
+      formData.append('total_chunks', '1');
+
+      console.log('Uploading video:', { recordingId, uri, mimeType, fileName, fileSize });
+      
+      const response = await axios.post(
+        `${API_URL}/api/recordings/${recordingId}/upload-video`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 300000, // 5 min timeout
+          onUploadProgress: (progressEvent) => {
+            const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
+            console.log('Video upload progress:', progress.toFixed(1) + '%');
+          }
+        }
+      );
+      
+      console.log('Video upload response:', response.data);
+      return response.data;
+    } catch (e: any) {
+      console.log('Video upload error:', e?.message || e);
+      throw e;
+    }
   };
 
   const uploadAudio = async (recordingId: string, uri: string) => {
-    const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (!fileInfo.exists) {
-      console.log('Audio file does not exist:', uri);
-      throw new Error('Audio file not found');
-    }
-    
-    console.log('Audio file info:', JSON.stringify(fileInfo));
-
-    const formData = new FormData();
-    formData.append('audio', {
-      uri,
-      type: 'audio/m4a',
-      name: 'recording.m4a',
-    } as any);
-
-    await axios.post(
-      `${API_URL}/api/recordings/${recordingId}/upload-audio`,
-      formData,
-      {
-        headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 120000,
+    try {
+      // Use new File API
+      const file = new File(uri);
+      const exists = file.exists;
+      
+      if (!exists) {
+        console.log('Audio file does not exist:', uri);
+        throw new Error('Audio file not found');
       }
-    );
+      
+      const fileSize = file.size || 0;
+      console.log('Audio file size:', fileSize);
+
+      const formData = new FormData();
+      formData.append('audio', {
+        uri,
+        type: 'audio/m4a',
+        name: 'recording.m4a',
+      } as any);
+
+      console.log('Uploading audio:', { recordingId, uri, fileSize });
+      
+      const response = await axios.post(
+        `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+        formData,
+        {
+          headers: { 'Content-Type': 'multipart/form-data' },
+          timeout: 120000,
+          onUploadProgress: (progressEvent) => {
+            const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
+            console.log('Audio upload progress:', progress.toFixed(1) + '%');
+          }
+        }
+      );
+      
+      console.log('Audio upload response:', response.data);
+      return response.data;
+    } catch (e: any) {
+      console.log('Audio upload error:', e?.message || e);
+      throw e;
+    }
   };
 
   const handleBarcode = async () => {
