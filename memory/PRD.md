@@ -7,12 +7,36 @@ XoW is a system for expo booths that records conversations and uses AI to analyz
 
 ## Core Features Implemented
 
-### 1. Automatic Transcription (Completed Dec 15, 2025)
+### 1. Dashboard Authentication (Completed Feb 17, 2026)
+- **Home Page** at `/api/home` with landing page design
+- **Login/Signup** modals with email/password authentication
+- User session stored in localStorage for persistence
+- Redirect to dashboard after successful login
+
+### 2. Device Management with OTP (Completed Feb 17, 2026)
+- **6-digit static device code** generated for each mobile app
+- **8-digit OTP** generated when dashboard user adds a device
+- OTP expires in 10 minutes
+- **Maximum 10 devices** per dashboard account
+- Device association flow:
+  1. Mobile app shows 6-digit code
+  2. Dashboard user enters code, gets 8-digit OTP
+  3. User enters OTP in mobile app to complete association
+- Devices can be removed from dashboard
+
+### 3. Bright Theme Dashboard (Completed Feb 17, 2026)
+- Clean white/slate background (rgb(248, 250, 252))
+- Violet/purple accent colors
+- Glass-morphism effects on cards
+- Modern, PLAUD-inspired design
+- Sidebar navigation with Overview, Sessions, Visitors, Devices tabs
+
+### 4. Automatic Transcription (Completed Dec 15, 2025)
 - Audio files uploaded to backend are automatically transcribed using OpenAI Whisper API
 - Transcription triggers automatically when audio is uploaded via `/api/recordings/{id}/upload-audio`
 - Falls back to manual transcript entry if needed
 
-### 2. AI Speaker Diarization (Completed Dec 15, 2025)
+### 5. AI Speaker Diarization (Completed Dec 15, 2025)
 Using OpenAI Whisper + GPT-4o for accurate speaker separation:
 
 **Features:**
@@ -31,7 +55,7 @@ Using OpenAI Whisper + GPT-4o for accurate speaker separation:
   - Sentiment (positive, interested, neutral, skeptical)
   - Dialogue segments with timestamps
 
-### 3. PLAUD-Style Dashboard UI (Completed Dec 15, 2025)
+### 6. PLAUD-Style Dashboard UI (Completed Dec 15, 2025)
 **Overall Summary Section:**
 - High-level conversation summary
 - Main topics as pills/tags
@@ -51,154 +75,106 @@ Using OpenAI Whisper + GPT-4o for accurate speaker separation:
   - Play button to jump to their speaking segment
   - Expandable full dialogue view
 
-### 4. Video/Audio Playback with Timestamp Jumping
+### 7. Video/Audio Playback with Timestamp Jumping
 - Click any speaker's Play button to jump to their segment
 - Click conversation cards to play from that timestamp
 - Works with both video and audio-only recordings
+- Download fallback for unsupported audio codecs
 
 ## Tech Stack
-- **Frontend**: React Native (Expo) for mobile, HTML/JS for web dashboard
-- **Backend**: FastAPI (Python)
-- **Database**: MongoDB with GridFS for media storage
-- **AI**: OpenAI API (GPT-4o for analysis, Whisper for transcription)
+- **Frontend**: React Native (Expo) for mobile, HTML/JS/Tailwind for web dashboard
+- **Backend**: FastAPI with Python
+- **Database**: MongoDB with GridFS for file storage
+- **AI**: OpenAI API (Whisper for transcription, GPT for analysis)
 
 ## API Endpoints
 
+### Dashboard Auth
+- `POST /api/dashboard/auth/signup` - Create new dashboard user
+- `POST /api/dashboard/auth/login` - Login dashboard user
+- `GET /api/dashboard/auth/user/{user_id}` - Get user details
+
+### Device Management
+- `POST /api/mobile/register-device` - Register mobile device, get 6-digit code
+- `POST /api/dashboard/devices/add` - Add device to dashboard, get 8-digit OTP
+- `POST /api/mobile/verify-otp` - Verify OTP from mobile app
+- `GET /api/dashboard/devices/{user_id}` - Get user's devices
+- `DELETE /api/dashboard/devices/{user_id}/{device_code}` - Remove device
+
 ### Recordings
-- `POST /api/recordings` - Create new recording
-- `GET /api/recordings` - List recordings
-- `GET /api/recordings/{id}` - Get recording details
-- `DELETE /api/recordings/{id}` - Delete recording
-- `POST /api/recordings/{id}/upload-audio` - Upload audio (triggers auto-processing)
-- `POST /api/recordings/{id}/upload-video` - Upload video
-- `POST /api/recordings/{id}/manual-transcript` - Add transcript manually
-- `POST /api/recordings/{id}/reprocess` - Re-run AI analysis
+- `GET /api/dashboard` - Serve dashboard HTML
+- `GET /api/home` - Serve home/landing page HTML
+- `GET /api/dashboard/recordings` - Get all recordings
+- `GET /api/dashboard/insights` - Get dashboard stats
+- `GET /api/recordings/{id}/audio` - Stream audio
+- `GET /api/recordings/{id}/video` - Stream video
 - `POST /api/recordings/{id}/translate` - Translate transcript
 
-### Dashboard
-- `GET /api/dashboard/insights` - Overview statistics
-- `GET /api/dashboard/recordings` - List recordings with filters
-- `GET /api/dashboard/visitors` - List visitor scans
-- `GET /api/dashboard` - Serve dashboard HTML
+## Database Schema
 
-## Data Model (recordings collection)
-```javascript
+### dashboard_users
+```json
 {
-  device_id: String,
-  booth_name: String,
-  expo_name: String,
-  start_time: DateTime,
-  end_time: DateTime,
-  duration: Float,
-  status: String, // recording, completed, uploaded, processing, processed, error
-  
-  // Media
-  has_video: Boolean,
-  has_audio: Boolean,
-  video_file_id: String,
-  audio_file_id: String,
-  
-  // Transcription
-  transcript: String,
-  translated_transcript: String,
-  
-  // AI Analysis - Summary
-  summary: String,
-  overall_summary: String,
-  highlights: [String],
-  visitor_interests: [String],
-  key_questions: [String],
-  main_topics: [String],
-  follow_up_actions: [String],
-  
-  // AI Analysis - Speaker Diarization
-  speakers: [{
-    id: String,
-    label: String,
-    label_source: String, // name_mentioned, barcode_scan, auto_generated
-    is_host: Boolean,
-    company: String,
-    role: String,
-    dialogue_segments: [{
-      start_percent: Number,
-      end_percent: Number,
-      start_time: Number,
-      end_time: Number,
-      content: String,
-      timestamp_label: String
-    }],
-    topics_discussed: [String],
-    questions_asked: [String],
-    key_points: [String],
-    sentiment: String,
-    total_speaking_time_percent: Number
-  }],
-  host_identified: Boolean,
-  total_speakers: Number,
-  
-  // Barcode Scans
-  barcode_scans: [{
-    barcode_data: String,
-    visitor_name: String,
-    scan_time: DateTime,
-    video_timestamp: Number
-  }]
+  "email": "string",
+  "password_hash": "string",
+  "name": "string",
+  "created_at": "datetime",
+  "devices": ["string"], // array of device codes
+  "is_active": true
 }
 ```
 
-## Completed Features (Dec 15, 2025)
+### mobile_devices
+```json
+{
+  "device_code": "string", // 6-digit
+  "device_name": "string",
+  "created_at": "datetime",
+  "dashboard_user_id": "string", // null if not associated
+  "associated_at": "datetime",
+  "pending_otp": "string", // 8-digit, cleared after verification
+  "otp_expiry": "datetime"
+}
+```
 
-### Mobile App Recording & Upload
-- **Video Recording**: Using `expo-camera` CameraView.recordAsync() for video capture
-- **Audio Recording**: Using `expo-av` Audio.Recording for high-quality audio
-- **Automatic Upload**: Files uploaded to backend after recording stops
-- **Progress Indicator**: Upload progress shown with percentage
+### recordings
+```json
+{
+  "device_id": "string",
+  "booth_name": "string",
+  "start_time": "datetime",
+  "duration": "number",
+  "has_video": true,
+  "has_audio": true,
+  "video_url": "string",
+  "audio_url": "string",
+  "status": "uploaded|processing|processed|error",
+  "transcript": "string",
+  "summary": "string",
+  "speakers": [{ ... }],
+  "conversations": [{ ... }]
+}
+```
 
-### Video Overlay System
-- **XoW Watermark**: Purple branded badge with camera icon in bottom-right
-- **Timestamp Overlay**: Date, time displayed in top-left corner
-- **Timecode**: Recording duration with frame count (HH:MM:SS:FF format)
-- **Device ID Badge**: Shows connected device identifier
-- **Recording Indicator**: Red "REC" badge when actively recording
-- **Visitor Counter**: Shows number of badge scans during recording
-- **LIVE Badge**: Indicates active recording status
+## Environment Variables
 
-### Gallery Enhancements
-- **Status Indicators**: Visual badges for recording/completed/uploaded/processing/processed/error
-- **Media Icons**: Shows video and audio availability
-- **AI Status**: Displays speaker count, host identification badge
-- **Summary Preview**: Shows AI-generated summary for processed recordings
-- **Reprocess Button**: Retry AI analysis for failed recordings
-
-## Upcoming Tasks (Backlog)
-
-### P0 - Critical
-(None - all core features completed)
-
-### P1 - High Priority
-1. **Barcode Scanner Integration**: Implement actual barcode scanning with expo-barcode-scanner
-2. **Offline Recording**: Store recordings locally when offline, sync when connection restored
-
-### P2 - Medium Priority
-1. **Real-time Recording Status**: WebSocket updates for recording status
-2. **Multi-language Translation**: Batch translate all conversations
-
-### P3 - Low Priority
-1. **Code Refactoring**: Break down `frontend/app/index.tsx` into smaller components
-2. **Backend Modularization**: Move AI processing to separate service files
-
-## Testing Status
-- Backend: Linting passed
-- Frontend: 100% pass rate on visual/functional testing
-- Test report: `/app/test_reports/iteration_1.json`
-
-## Known Limitations
-- Emergent LLM proxy is unreachable - using direct OpenAI API
-- Speaker diarization accuracy depends on audio quality and distinct speaking patterns
-- Mobile app recording functionality is placeholder only
-
-## Configuration
-Required environment variables in `backend/.env`:
+### Backend (.env)
 - `MONGO_URL` - MongoDB connection string
 - `DB_NAME` - Database name
 - `OPENAI_API_KEY` - OpenAI API key for Whisper and GPT
+
+## Test Credentials
+- **Dashboard User**: test@example.com / password123
+- **User ID**: 69946b3d5920418d9da30fc7
+- **Test Device Code**: 416100
+
+## Upcoming Tasks (P2)
+1. Update mobile app to show device code and OTP entry screen
+2. Re-enable automatic transcription on file upload
+3. Video overlays (timestamp, watermark, branding)
+
+## Future Tasks (P3)
+1. Refactor server.py into separate modules
+2. Break down frontend/app/index.tsx into components
+3. Add email verification for signup
+4. Add password reset flow
