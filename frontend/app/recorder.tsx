@@ -157,16 +157,20 @@ export default function RecorderScreen() {
   const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
   const getRecordingsDir = async () => {
-    // FileSystem.documentDirectory already has trailing slash
-    const baseDir = FileSystem.documentDirectory;
-    if (!baseDir) {
+    const docDir = getDocDir();
+    if (!docDir) {
+      console.error('Document directory not available');
       throw new Error('Document directory not available');
     }
-    const recordingsDir = baseDir + 'xow_recordings/';
-    const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
-    if (!dirInfo.exists) {
-      await FileSystem.makeDirectoryAsync(recordingsDir, { intermediates: true });
-      console.log('Created recordings directory:', recordingsDir);
+    const recordingsDir = docDir + 'xow_recordings/';
+    try {
+      const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
+      if (!dirInfo.exists) {
+        await FileSystem.makeDirectoryAsync(recordingsDir, { intermediates: true });
+        console.log('Created recordings directory:', recordingsDir);
+      }
+    } catch (e: any) {
+      console.log('Error creating recordings dir:', e?.message || e);
     }
     return recordingsDir;
   };
