@@ -15,7 +15,7 @@ import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
-import { File, Paths } from 'expo-file-system/next';
+import * as FileSystem from 'expo-file-system';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -149,11 +149,11 @@ export default function RecorderScreen() {
   const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
   const getRecordingsDir = async () => {
-    const docsDir = Paths.document;
-    const recordingsDir = `${docsDir}/xow_recordings`;
-    const dirFile = new File(recordingsDir);
-    if (!dirFile.exists) {
-      await dirFile.create({ intermediates: true });
+    const recordingsDir = `${FileSystem.documentDirectory}xow_recordings/`;
+    const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
+    if (!dirInfo.exists) {
+      await FileSystem.makeDirectoryAsync(recordingsDir, { intermediates: true });
+      console.log('Created recordings directory:', recordingsDir);
     }
     return recordingsDir;
   };
@@ -239,6 +239,7 @@ export default function RecorderScreen() {
           console.log('Stopping video recording...');
           cameraRef.current.stopRecording();
           
+          // Wait for video to be saved (up to 10 seconds)
           for (let i = 0; i < 100; i++) {
             await new Promise(resolve => setTimeout(resolve, 100));
             if (videoUriRef.current) {
@@ -264,7 +265,7 @@ export default function RecorderScreen() {
 
       setSaveProgress(20);
 
-      // Save files locally
+      // Save files locally using standard expo-file-system
       const recordingsDir = await getRecordingsDir();
       const timestamp = Date.now();
       let savedVideoPath: string | null = null;
@@ -274,14 +275,21 @@ export default function RecorderScreen() {
       if (videoUri) {
         try {
           const videoExt = videoUri.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
-          const destVideoPath = `${recordingsDir}/video_${timestamp}.${videoExt}`;
-          const srcFile = new File(videoUri);
-          const destFile = new File(destVideoPath);
+          const destVideoPath = `${recordingsDir}video_${timestamp}.${videoExt}`;
           
-          if (srcFile.exists) {
-            await srcFile.copy(destFile);
+          // Check if source exists
+          const srcInfo = await FileSystem.getInfoAsync(videoUri);
+          console.log('Video source info:', srcInfo);
+          
+          if (srcInfo.exists) {
+            await FileSystem.copyAsync({
+              from: videoUri,
+              to: destVideoPath,
+            });
             savedVideoPath = destVideoPath;
             console.log('Video copied to:', savedVideoPath);
+          } else {
+            console.log('Video source does not exist:', videoUri);
           }
         } catch (e: any) {
           console.log('Video copy error:', e?.message || e);
@@ -292,14 +300,21 @@ export default function RecorderScreen() {
       // Copy audio to local storage
       if (audioUri) {
         try {
-          const destAudioPath = `${recordingsDir}/audio_${timestamp}.m4a`;
-          const srcFile = new File(audioUri);
-          const destFile = new File(destAudioPath);
+          const destAudioPath = `${recordingsDir}audio_${timestamp}.m4a`;
           
-          if (srcFile.exists) {
-            await srcFile.copy(destFile);
+          // Check if source exists
+          const srcInfo = await FileSystem.getInfoAsync(audioUri);
+          console.log('Audio source info:', srcInfo);
+          
+          if (srcInfo.exists) {
+            await FileSystem.copyAsync({
+              from: audioUri,
+              to: destAudioPath,
+            });
             savedAudioPath = destAudioPath;
             console.log('Audio copied to:', savedAudioPath);
+          } else {
+            console.log('Audio source does not exist:', audioUri);
           }
         } catch (e: any) {
           console.log('Audio copy error:', e?.message || e);
@@ -309,7 +324,7 @@ export default function RecorderScreen() {
 
       // Save recording metadata locally
       const localRecording: LocalRecording = {
-        id: '', // Will be set after cloud upload
+        id: '',
         localId: currentRecording.localId,
         videoPath: savedVideoPath,
         audioPath: savedAudioPath,
@@ -329,7 +344,7 @@ export default function RecorderScreen() {
       setSaveProgress(80);
 
       // Auto upload if enabled and online
-      if (autoUpload && isOnline) {
+      if (autoUpload && isOnline && (savedVideoPath || savedAudioPath)) {
         showToast('Uploading to cloud...');
         try {
           await uploadRecordingToCloud(localRecording);
@@ -339,22 +354,25 @@ export default function RecorderScreen() {
           showToast('Saved locally. Upload later from Gallery.', true);
         }
       } else {
-        showToast(`Saved locally! ${barcodeCount} visitors${savedVideoPath ? ' • Video + Audio' : ' • Audio only'}`);
+        const hasMedia = savedVideoPath || savedAudioPath;
+        if (hasMedia) {
+          showToast(`Saved locally! ${barcodeCount} visitors${savedVideoPath ? ' • Video + Audio' : ' • Audio only'}`);
+        } else {
+          showToast('Recording saved (no media captured)', true);
+        }
       }
 
       setSaveProgress(100);
 
       // Clean up temp files
-      if (videoUri && savedVideoPath) {
+      if (videoUri && savedVideoPath && videoUri !== savedVideoPath) {
         try { 
-          const tempFile = new File(videoUri);
-          if (tempFile.exists) await tempFile.delete();
+          await FileSystem.deleteAsync(videoUri, { idempotent: true });
         } catch {}
       }
-      if (audioUri && savedAudioPath) {
+      if (audioUri && savedAudioPath && audioUri !== savedAudioPath) {
         try { 
-          const tempFile = new File(audioUri);
-          if (tempFile.exists) await tempFile.delete();
+          await FileSystem.deleteAsync(audioUri, { idempotent: true });
         } catch {}
       }
 
@@ -366,7 +384,7 @@ export default function RecorderScreen() {
       videoUriRef.current = null;
     } catch (e: any) {
       console.error('Stop recording error:', e?.message || e);
-      showToast('Save failed', true);
+      showToast('Save failed: ' + (e?.message || 'Unknown error'), true);
     } finally {
       setIsSaving(false);
       setSaveProgress(0);
@@ -396,16 +414,46 @@ export default function RecorderScreen() {
 
     // Upload video if available
     if (recording.videoPath) {
-      await uploadVideoFile(recordingId, recording.videoPath);
+      const fileInfo = await FileSystem.getInfoAsync(recording.videoPath);
+      if (fileInfo.exists) {
+        const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
+        const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
+        const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
+
+        await FileSystem.uploadAsync(
+          `${API_URL}/api/recordings/${recordingId}/upload-video`,
+          recording.videoPath,
+          {
+            fieldName: 'video',
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+            parameters: {
+              chunk_index: '0',
+              total_chunks: '1',
+            },
+          }
+        );
+      }
     }
 
     // Upload audio if available
     if (recording.audioPath) {
-      await uploadAudioFile(recordingId, recording.audioPath);
+      const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
+      if (fileInfo.exists) {
+        await FileSystem.uploadAsync(
+          `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+          recording.audioPath,
+          {
+            fieldName: 'audio',
+            httpMethod: 'POST',
+            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+          }
+        );
+      }
     }
 
     // Upload barcode scans
-    for (const scan of recording.barcodeScansList) {
+    for (const scan of recording.barcodeScansList || []) {
       try {
         await axios.post(`${API_URL}/api/barcodes`, {
           recording_id: recordingId,
@@ -429,48 +477,6 @@ export default function RecorderScreen() {
     }
 
     return recordingId;
-  };
-
-  const uploadVideoFile = async (recordingId: string, videoPath: string) => {
-    const file = new File(videoPath);
-    if (!file.exists) throw new Error('Video file not found');
-
-    const isMovFile = videoPath.toLowerCase().endsWith('.mov');
-    const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
-    const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
-
-    const formData = new FormData();
-    formData.append('video', {
-      uri: videoPath,
-      type: mimeType,
-      name: fileName,
-    } as any);
-    formData.append('chunk_index', '0');
-    formData.append('total_chunks', '1');
-
-    await axios.post(
-      `${API_URL}/api/recordings/${recordingId}/upload-video`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }
-    );
-  };
-
-  const uploadAudioFile = async (recordingId: string, audioPath: string) => {
-    const file = new File(audioPath);
-    if (!file.exists) throw new Error('Audio file not found');
-
-    const formData = new FormData();
-    formData.append('audio', {
-      uri: audioPath,
-      type: 'audio/m4a',
-      name: 'recording.m4a',
-    } as any);
-
-    await axios.post(
-      `${API_URL}/api/recordings/${recordingId}/upload-audio`,
-      formData,
-      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 }
-    );
   };
 
   const handleBarcode = async () => {
