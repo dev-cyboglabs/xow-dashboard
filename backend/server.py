@@ -1446,6 +1446,11 @@ async def health_check():
 # Include the router in the main app
 app.include_router(api_router)
 
+# Serve home page (landing page with auth)
+@app.get("/api/home")
+async def serve_home():
+    return FileResponse(ROOT_DIR / "static" / "index.html")
+
 # Serve dashboard
 @app.get("/api/dashboard")
 async def serve_dashboard():
