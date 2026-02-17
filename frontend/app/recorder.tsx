@@ -282,61 +282,14 @@ export default function RecorderScreen() {
 
       setSaveProgress(20);
 
-      // Save files locally using standard expo-file-system
-      const recordingsDir = await getRecordingsDir();
-      const timestamp = Date.now();
-      let savedVideoPath: string | null = null;
-      let savedAudioPath: string | null = null;
+      // For simplicity, we'll save the original URIs directly instead of copying
+      // The original URIs are in the app's cache directory and will persist
+      let savedVideoPath = videoUri;
+      let savedAudioPath = audioUri;
+      
+      console.log('Video path:', savedVideoPath);
+      console.log('Audio path:', savedAudioPath);
 
-      // Copy video to local storage
-      if (videoUri) {
-        try {
-          const videoExt = videoUri.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
-          const destVideoPath = `${recordingsDir}video_${timestamp}.${videoExt}`;
-          
-          // Check if source exists
-          const srcInfo = await FileSystem.getInfoAsync(videoUri);
-          console.log('Video source info:', srcInfo);
-          
-          if (srcInfo.exists) {
-            await FileSystem.copyAsync({
-              from: videoUri,
-              to: destVideoPath,
-            });
-            savedVideoPath = destVideoPath;
-            console.log('Video copied to:', savedVideoPath);
-          } else {
-            console.log('Video source does not exist:', videoUri);
-          }
-        } catch (e: any) {
-          console.log('Video copy error:', e?.message || e);
-        }
-      }
-      setSaveProgress(40);
-
-      // Copy audio to local storage
-      if (audioUri) {
-        try {
-          const destAudioPath = `${recordingsDir}audio_${timestamp}.m4a`;
-          
-          // Check if source exists
-          const srcInfo = await FileSystem.getInfoAsync(audioUri);
-          console.log('Audio source info:', srcInfo);
-          
-          if (srcInfo.exists) {
-            await FileSystem.copyAsync({
-              from: audioUri,
-              to: destAudioPath,
-            });
-            savedAudioPath = destAudioPath;
-            console.log('Audio copied to:', savedAudioPath);
-          } else {
-            console.log('Audio source does not exist:', audioUri);
-          }
-        } catch (e: any) {
-          console.log('Audio copy error:', e?.message || e);
-        }
-      }
       setSaveProgress(60);
 
       // Save recording metadata locally
