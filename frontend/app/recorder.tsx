@@ -137,19 +137,19 @@ export default function RecorderScreen() {
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
       frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
 
-      // Start video recording
+      // Start video recording - the promise resolves when recording stops
       if (cameraRef.current) {
-        try {
-          const videoResult = await cameraRef.current.recordAsync({
-            maxDuration: 3600, // 1 hour max
-          });
-          // This promise resolves when recording stops
+        console.log('Starting video recording...');
+        cameraRef.current.recordAsync({
+          maxDuration: 3600, // 1 hour max
+        }).then((videoResult) => {
+          console.log('Video recording completed:', videoResult?.uri);
           if (videoResult?.uri) {
             videoUriRef.current = videoResult.uri;
           }
-        } catch (videoErr) {
-          console.log('Video recording not supported on this platform:', videoErr);
-        }
+        }).catch((videoErr) => {
+          console.log('Video recording error:', videoErr);
+        });
       }
 
       // Start audio recording (as backup and for better quality transcription)
@@ -158,6 +158,7 @@ export default function RecorderScreen() {
         await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
         await rec.startAsync();
         audioRecording.current = rec;
+        console.log('Audio recording started');
       } catch (audioErr) {
         console.log('Audio recording error:', audioErr);
       }
