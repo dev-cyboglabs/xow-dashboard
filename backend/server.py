@@ -1161,10 +1161,12 @@ async def get_dashboard_recordings():
     result = []
     
     for r in recordings:
+        # Get the recording ID before serializing
+        recording_id = str(r['_id'])
         rec_data = serialize_doc(r)
         
         # Get visitor badges for this recording
-        visitors = await db.visitor_badges.find({"recording_id": str(r['_id'])}).to_list(50)
+        visitors = await db.visitor_badges.find({"recording_id": recording_id}).to_list(50)
         rec_data['visitor_badges'] = [serialize_doc(v) for v in visitors]
         
         result.append(rec_data)
