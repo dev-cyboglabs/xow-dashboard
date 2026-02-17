@@ -15,6 +15,8 @@ from datetime import datetime, timedelta
 import base64
 import io
 import json
+import subprocess
+import tempfile
 from openai import OpenAI
 
 ROOT_DIR = Path(__file__).parent
@@ -48,431 +50,106 @@ logging.basicConfig(
 )
 logger = logging.getLogger(__name__)
 
-# ==================== MODELS ====================
+# CORS configuration
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
-class DeviceLogin(BaseModel):
-    device_id: str
-    password: str
-
+# Pydantic models
 class DeviceCreate(BaseModel):
     device_id: str
     password: str
     name: str
 
-class Device(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+class DeviceLogin(BaseModel):
     device_id: str
-    name: str
-    created_at: datetime = Field(default_factory=datetime.utcnow)
-    is_active: bool = True
+    password: str
 
 class RecordingCreate(BaseModel):
     device_id: str
-    expo_name: Optional[str] = "Default Expo"
-    booth_name: Optional[str] = "Default Booth"
-
-class Recording(BaseModel):
-    id: str
-    device_id: str
     expo_name: str
     booth_name: str
-    start_time: datetime
-    end_time: Optional[datetime] = None
-    duration: Optional[float] = None
-    status: str = "recording"  # recording, completed, uploaded, processed
-    has_video: bool = False
-    has_audio: bool = False
-    transcript: Optional[str] = None
-    translated_transcript: Optional[str] = None
-    summary: Optional[str] = None
-    highlights: List[Dict[str, Any]] = []
-    barcode_scans: List[Dict[str, Any]] = []
 
-class BarcodeScan(BaseModel):
-    id: str = Field(default_factory=lambda: str(uuid.uuid4()))
+class BarcodeCreate(BaseModel):
     recording_id: str
     barcode_data: str
-    visitor_name: Optional[str] = None
-    scan_time: datetime = Field(default_factory=datetime.utcnow)
-    video_timestamp: Optional[float] = None  # seconds from start of recording
-
-class BarcodeScanCreate(BaseModel):
-    recording_id: str
-    barcode_data: str
-    visitor_name: Optional[str] = None
     video_timestamp: Optional[float] = None
     frame_code: Optional[int] = None
 
-class TranscriptRequest(BaseModel):
+# Visitor Badge Model
+class VisitorBadge(BaseModel):
+    badge_id: str
     recording_id: str
-    target_language: str = "en"
+    visitor_label: str  # Barcode or auto-generated
+    start_time: float  # Seconds from start
+    end_time: float
+    summary: str  # AI-generated summary of conversation
+    topics: List[str]
+    questions_asked: List[str]
+    sentiment: str
+    key_points: List[str]
+    is_barcode_linked: bool = False
 
-class DashboardInsight(BaseModel):
-    total_recordings: int
-    total_visitors: int
-    total_duration_hours: float
-    top_topics: List[str]
-    recent_activity: List[Dict[str, Any]]
-
-# ==================== HELPER FUNCTIONS ====================
-
+# Helper function to serialize MongoDB documents
 def serialize_doc(doc):
-    """Convert MongoDB document to JSON serializable format"""
     if doc is None:
         return None
     doc['id'] = str(doc.pop('_id'))
-    # Handle nested ObjectIds
-    if 'barcode_scans' in doc and doc['barcode_scans']:
-        doc['barcode_scans'] = [
-            {k: str(v) if isinstance(v, ObjectId) else v for k, v in scan.items()}
-            for scan in doc['barcode_scans']
-        ]
+    for key, value in doc.items():
+        if isinstance(value, ObjectId):
+            doc[key] = str(value)
+        elif isinstance(value, datetime):
+            doc[key] = value.isoformat()
     return doc
 
-async def transcribe_audio(audio_data: bytes) -> str:
-    """Transcribe audio using OpenAI Whisper"""
-    # Check if Whisper client is available
-    if not whisper_client:
-        logger.warning("Whisper API not configured - OPENAI_API_KEY not set. Audio transcription unavailable.")
-        return ""
-    
+# Extract audio from video using ffmpeg
+async def extract_audio_from_video(video_data: bytes, video_format: str = "mp4") -> bytes:
+    """Extract audio track from video file using ffmpeg"""
     try:
-        # Create a temporary file-like object
-        audio_file = io.BytesIO(audio_data)
-        audio_file.name = "audio.webm"
+        with tempfile.NamedTemporaryFile(suffix=f'.{video_format}', delete=False) as video_file:
+            video_file.write(video_data)
+            video_path = video_file.name
         
-        response = whisper_client.audio.transcriptions.create(
-            model="whisper-1",
-            file=audio_file,
-            response_format="text"
-        )
-        return response
+        audio_path = video_path.replace(f'.{video_format}', '.m4a')
+        
+        # Use ffmpeg to extract audio
+        cmd = [
+            'ffmpeg', '-i', video_path,
+            '-vn',  # No video
+            '-acodec', 'aac',  # AAC audio codec
+            '-b:a', '128k',  # Audio bitrate
+            '-y',  # Overwrite output
+            audio_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, timeout=300)
+        
+        if result.returncode != 0:
+            logger.error(f"FFmpeg error: {result.stderr.decode()}")
+            return None
+        
+        with open(audio_path, 'rb') as f:
+            audio_data = f.read()
+        
+        # Cleanup temp files
+        os.unlink(video_path)
+        os.unlink(audio_path)
+        
+        logger.info(f"Successfully extracted audio from video ({len(audio_data)} bytes)")
+        return audio_data
     except Exception as e:
-        logger.error(f"Transcription error: {e}")
-        return ""
+        logger.error(f"Audio extraction failed: {e}")
+        return None
 
-async def translate_text(text: str, target_language: str = "en") -> str:
-    """Translate text using GPT"""
-    if not text or target_language == "en":
-        return text
-    
-    try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": f"You are a translator. Translate the following text to {target_language}. Only return the translation, nothing else."},
-                {"role": "user", "content": text}
-            ]
-        )
-        return response.choices[0].message.content
-    except Exception as e:
-        logger.error(f"Translation error: {e}")
-        return text
+# ==================== HEALTH CHECK ====================
 
-async def summarize_text(text: str) -> Dict[str, Any]:
-    """Summarize conversation text using GPT and extract highlights"""
-    if not text:
-        return {"summary": "", "highlights": []}
-    
-    try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": """You are an AI assistant analyzing expo booth conversations. 
-                Analyze the transcript and provide:
-                1. A concise summary (2-3 sentences)
-                2. Key highlights/topics discussed (as a list)
-                3. Notable visitor interests or questions
-                
-                Return as JSON format:
-                {
-                    "summary": "...",
-                    "highlights": ["highlight1", "highlight2", ...],
-                    "visitor_interests": ["interest1", "interest2", ...],
-                    "key_questions": ["question1", "question2", ...]
-                }"""},
-                {"role": "user", "content": f"Transcript:\n{text}"}
-            ],
-            response_format={"type": "json_object"}
-        )
-        return json.loads(response.choices[0].message.content)
-    except Exception as e:
-        logger.error(f"Summarization error: {e}")
-        return {"summary": "", "highlights": []}
-
-async def detect_conversations(text: str, total_duration: float = 0) -> List[Dict[str, Any]]:
-    """Detect and segment individual conversations from transcript using GPT"""
-    if not text:
-        return []
-    
-    try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": f"""You are an AI analyzing expo booth recordings. The total recording duration is approximately {total_duration} seconds.
-                
-Your task is to identify SEPARATE conversations/interactions between booth staff and visitors.
-
-For each conversation segment, provide:
-1. A brief title/topic of the conversation
-2. Who the speakers appear to be (e.g., "Staff", "Visitor 1", "Visitor 2")
-3. Estimated start time as a percentage of the recording (0-100)
-4. A 1-2 sentence summary of what was discussed
-5. Key points or interests expressed
-6. Sentiment (positive, neutral, interested, skeptical)
-
-Return as JSON:
-{{
-    "conversations": [
-        {{
-            "id": 1,
-            "title": "Product Demo Discussion",
-            "speakers": ["Staff", "Visitor"],
-            "start_percent": 0,
-            "end_percent": 25,
-            "summary": "...",
-            "key_points": ["point1", "point2"],
-            "sentiment": "interested",
-            "excerpt": "brief quote from conversation"
-        }}
-    ],
-    "total_interactions": 3,
-    "main_topics": ["topic1", "topic2"]
-}}
-
-If you cannot clearly distinguish separate conversations, create logical segments based on topic changes."""},
-                {"role": "user", "content": f"Transcript:\n{text}"}
-            ],
-            response_format={"type": "json_object"}
-        )
-        result = json.loads(response.choices[0].message.content)
-        
-        # Convert percentages to actual timestamps
-        conversations = result.get('conversations', [])
-        for conv in conversations:
-            conv['start_time'] = (conv.get('start_percent', 0) / 100) * total_duration
-            conv['end_time'] = (conv.get('end_percent', 100) / 100) * total_duration
-        
-        return {
-            "conversations": conversations,
-            "total_interactions": result.get('total_interactions', len(conversations)),
-            "main_topics": result.get('main_topics', [])
-        }
-    except Exception as e:
-        logger.error(f"Conversation detection error: {e}")
-        return {"conversations": [], "total_interactions": 0, "main_topics": []}
-
-async def perform_speaker_diarization(transcript: str, barcode_scans: List[Dict], total_duration: float = 0) -> Dict[str, Any]:
-    """
-    Advanced speaker diarization using GPT to:
-    1. Separate speakers from transcript
-    2. Identify recurring "host" voice vs guests
-    3. Label speakers with names (if mentioned) or barcode IDs
-    4. Extract key points and topics for each speaker
-    """
-    if not transcript or not openai_client:
-        return {"speakers": [], "overall_summary": "", "host_identified": False}
-    
-    # Format barcode scans for context
-    barcode_context = ""
-    if barcode_scans:
-        barcode_context = "\n\nBarcode scans during recording (timestamp in seconds -> barcode ID):\n"
-        for scan in barcode_scans:
-            ts = scan.get('video_timestamp', 0) or 0
-            barcode_context += f"- {ts:.1f}s: {scan.get('barcode_data', 'Unknown')}\n"
-    
-    try:
-        response = openai_client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": f"""You are an advanced AI analyzing expo booth recordings for speaker identification and conversation analysis.
-
-TOTAL RECORDING DURATION: {total_duration:.1f} seconds
-{barcode_context}
-
-YOUR TASKS:
-1. **Speaker Identification**: Identify distinct speakers in the transcript. Look for:
-   - Different speaking patterns, vocabulary, or topics
-   - Natural conversation turn-taking cues
-   - Introduction phrases like "Hi, I'm..." or "My name is..."
-   - Company/role mentions like "I work at..." or "I'm from..."
-
-2. **Host Identification**: The "host" is typically:
-   - The booth staff who speaks most frequently
-   - Uses welcoming phrases ("Welcome to our booth", "Let me show you...")
-   - Explains products/services consistently
-   - Mark one speaker as "is_host": true
-
-3. **Speaker Labeling Priority**:
-   - If someone says their name → Use that name
-   - If a barcode was scanned around their speaking time (±30 seconds) → Use barcode ID
-   - Otherwise → Use generic labels like "Guest 1", "Guest 2"
-
-4. **For each speaker, extract**:
-   - Their spoken content/dialogue segments
-   - Key topics they discussed
-   - Questions they asked
-   - Their apparent interests or concerns
-   - Company/organization if mentioned
-   - Sentiment (interested, skeptical, positive, neutral)
-
-5. **Overall Analysis**:
-   - Create an overall summary of all conversations
-   - Identify main discussion topics
-   - Note any follow-up actions mentioned
-
-Return JSON format:
-{{
-    "speakers": [
-        {{
-            "id": "speaker_1",
-            "label": "John Smith" or "BARCODE-12345" or "Guest 1",
-            "label_source": "name_mentioned" or "barcode_scan" or "auto_generated",
-            "is_host": true/false,
-            "company": "Acme Corp" or null,
-            "role": "Product Manager" or null,
-            "dialogue_segments": [
-                {{
-                    "start_percent": 0,
-                    "end_percent": 15,
-                    "content": "What they said...",
-                    "timestamp_label": "0:00 - 0:45"
-                }}
-            ],
-            "topics_discussed": ["product features", "pricing"],
-            "questions_asked": ["How does X work?"],
-            "key_points": ["Interested in feature Y", "Budget concern mentioned"],
-            "sentiment": "interested",
-            "total_speaking_time_percent": 30
-        }}
-    ],
-    "overall_summary": "Brief 2-3 sentence summary of all conversations",
-    "main_topics": ["topic1", "topic2"],
-    "host_identified": true/false,
-    "follow_up_actions": ["Send brochure to...", "Schedule demo..."],
-    "total_speakers": 3
-}}
-
-IMPORTANT: Be thorough in separating speakers. Even subtle cues like topic changes or question/answer patterns can indicate different speakers."""},
-                {"role": "user", "content": f"Transcript:\n{transcript}"}
-            ],
-            response_format={"type": "json_object"}
-        )
-        
-        result = json.loads(response.choices[0].message.content)
-        
-        # Convert percentages to actual timestamps for each speaker's segments
-        speakers = result.get('speakers', [])
-        for speaker in speakers:
-            for segment in speaker.get('dialogue_segments', []):
-                start_pct = segment.get('start_percent', 0)
-                end_pct = segment.get('end_percent', 0)
-                segment['start_time'] = (start_pct / 100) * total_duration
-                segment['end_time'] = (end_pct / 100) * total_duration
-        
-        return result
-    except Exception as e:
-        logger.error(f"Speaker diarization error: {e}")
-        return {"speakers": [], "overall_summary": "", "host_identified": False, "error": str(e)}
-
-async def process_transcription_with_diarization(recording_id: str):
-    """Background task to process transcription with advanced speaker diarization"""
-    try:
-        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
-        if not recording:
-            logger.error(f"Recording not found: {recording_id}")
-            return
-        
-        # Download audio
-        try:
-            grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
-            audio_data = await grid_out.read()
-        except Exception as e:
-            logger.error(f"Failed to download audio: {e}")
-            await db.recordings.update_one(
-                {"_id": ObjectId(recording_id)},
-                {"$set": {"status": "error", "error_message": "Failed to download audio file"}}
-            )
-            return
-        
-        # Step 1: Transcribe with Whisper
-        logger.info(f"Starting transcription for recording {recording_id}")
-        transcript = await transcribe_audio(audio_data)
-        
-        # Get duration for conversation detection
-        duration = recording.get('duration', 0) or 0
-        barcode_scans = recording.get('barcode_scans', []) or []
-        
-        # If transcript is empty, still mark as processed but skip AI analysis
-        if not transcript or transcript.strip() == "":
-            await db.recordings.update_one(
-                {"_id": ObjectId(recording_id)},
-                {"$set": {
-                    "transcript": "",
-                    "summary": "No speech detected in audio",
-                    "highlights": [],
-                    "speakers": [],
-                    "conversations": [],
-                    "status": "processed"
-                }}
-            )
-            logger.info(f"No speech detected for recording {recording_id}")
-            return
-        
-        # Step 2: Perform advanced speaker diarization
-        logger.info(f"Performing speaker diarization for recording {recording_id}")
-        diarization_result = await perform_speaker_diarization(transcript, barcode_scans, duration)
-        
-        # Step 3: Generate overall summary and highlights (keeping existing functionality)
-        analysis = await summarize_text(transcript)
-        
-        # Step 4: Also detect conversations for backward compatibility
-        conversation_data = await detect_conversations(transcript, duration)
-        conversations = conversation_data.get('conversations', []) if isinstance(conversation_data, dict) else []
-        
-        # Match barcode scans to conversations
-        for conv in conversations:
-            if isinstance(conv, dict):
-                conv_start = conv.get('start_time', 0) or 0
-                conv_end = conv.get('end_time', duration) or duration
-                matching_barcodes = []
-                for scan in barcode_scans:
-                    if isinstance(scan, dict):
-                        scan_ts = scan.get('video_timestamp', 0) or 0
-                        if conv_start - 5 <= scan_ts <= conv_end + 5:
-                            matching_barcodes.append(scan.get('barcode_data', ''))
-                conv['associated_barcodes'] = matching_barcodes
-        
-        # Update recording with all data
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {
-                "transcript": transcript,
-                "summary": analysis.get('summary', '') if isinstance(analysis, dict) else '',
-                "highlights": analysis.get('highlights', []) if isinstance(analysis, dict) else [],
-                "visitor_interests": analysis.get('visitor_interests', []) if isinstance(analysis, dict) else [],
-                "key_questions": analysis.get('key_questions', []) if isinstance(analysis, dict) else [],
-                # New speaker diarization data
-                "speakers": diarization_result.get('speakers', []),
-                "overall_summary": diarization_result.get('overall_summary', ''),
-                "host_identified": diarization_result.get('host_identified', False),
-                "follow_up_actions": diarization_result.get('follow_up_actions', []),
-                "total_speakers": diarization_result.get('total_speakers', 0),
-                # Existing conversation data
-                "conversations": conversations,
-                "total_interactions": conversation_data.get('total_interactions', 0) if isinstance(conversation_data, dict) else 0,
-                "main_topics": diarization_result.get('main_topics', []) or conversation_data.get('main_topics', []),
-                "status": "processed"
-            }}
-        )
-        
-        logger.info(f"Transcription with diarization completed for recording {recording_id}")
-    except Exception as e:
-        logger.error(f"Transcription with diarization error: {e}")
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {"status": "error", "error_message": str(e)}}
-        )
+@api_router.get("/health")
+async def health_check():
+    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
 
 # ==================== DASHBOARD AUTH MODELS ====================
 
@@ -486,7 +163,7 @@ class DashboardUserLogin(BaseModel):
     password: str
 
 class DeviceAssociationRequest(BaseModel):
-    device_code: str  # 6-digit device ID shown on app
+    device_code: str
 
 # ==================== AUTH ENDPOINTS (Mobile App) ====================
 
@@ -543,7 +220,7 @@ async def dashboard_signup(user: DashboardUserCreate):
         "password_hash": password_hash,
         "name": user.name,
         "created_at": datetime.utcnow(),
-        "devices": [],  # List of associated device IDs (max 10)
+        "devices": [],
         "is_active": True
     }
     result = await db.dashboard_users.insert_one(user_doc)
@@ -593,29 +270,23 @@ async def add_device_to_dashboard(request: DeviceAssociationRequest, user_id: st
     """Add a device to dashboard account by generating an OTP"""
     import random
     
-    # Verify user exists
     user = await db.dashboard_users.find_one({"_id": ObjectId(user_id)})
     if not user:
         raise HTTPException(status_code=404, detail="User not found")
     
-    # Check device limit (max 10)
     if len(user.get('devices', [])) >= 10:
         raise HTTPException(status_code=400, detail="Maximum 10 devices allowed per account")
     
-    # Check if device exists in the system (static 6-digit ID)
     device = await db.mobile_devices.find_one({"device_code": request.device_code})
     if not device:
         raise HTTPException(status_code=404, detail="Device not found. Please check the 6-digit code on your app.")
     
-    # Check if device is already associated with another dashboard
     if device.get('dashboard_user_id'):
         raise HTTPException(status_code=400, detail="This device is already associated with another account")
     
-    # Generate 8-digit OTP
     otp = ''.join([str(random.randint(0, 9)) for _ in range(8)])
-    otp_expiry = datetime.utcnow() + timedelta(minutes=10)  # OTP valid for 10 minutes
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)
     
-    # Store OTP in device record
     await db.mobile_devices.update_one(
         {"device_code": request.device_code},
         {"$set": {
@@ -641,7 +312,6 @@ async def verify_device_otp(device_code: str, otp: str):
     if not device:
         raise HTTPException(status_code=404, detail="Device not found")
     
-    # Check if OTP matches and is not expired
     if device.get('pending_otp') != otp:
         raise HTTPException(status_code=401, detail="Invalid OTP")
     
@@ -652,7 +322,6 @@ async def verify_device_otp(device_code: str, otp: str):
     if not pending_user_id:
         raise HTTPException(status_code=400, detail="No pending association found")
     
-    # Associate device with dashboard user
     await db.mobile_devices.update_one(
         {"device_code": device_code},
         {
@@ -668,7 +337,6 @@ async def verify_device_otp(device_code: str, otp: str):
         }
     )
     
-    # Add device to user's devices list
     await db.dashboard_users.update_one(
         {"_id": ObjectId(pending_user_id)},
         {"$addToSet": {"devices": device_code}}
@@ -684,7 +352,6 @@ async def register_mobile_device(device_name: str = "Mobile Device"):
     """Register a new mobile device and get a 6-digit static code"""
     import random
     
-    # Generate unique 6-digit code
     while True:
         device_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
         existing = await db.mobile_devices.find_one({"device_code": device_code})
@@ -695,7 +362,7 @@ async def register_mobile_device(device_name: str = "Mobile Device"):
         "device_code": device_code,
         "device_name": device_name,
         "created_at": datetime.utcnow(),
-        "dashboard_user_id": None,  # Not associated yet
+        "dashboard_user_id": None,
         "is_active": True
     }
     result = await db.mobile_devices.insert_one(device_doc)
@@ -739,13 +406,11 @@ async def get_user_devices(user_id: str):
 async def remove_device_from_dashboard(user_id: str, device_code: str):
     """Remove a device from dashboard account"""
     try:
-        # Remove from user's devices list
         await db.dashboard_users.update_one(
             {"_id": ObjectId(user_id)},
             {"$pull": {"devices": device_code}}
         )
         
-        # Clear association in device record
         await db.mobile_devices.update_one(
             {"device_code": device_code},
             {"$set": {"dashboard_user_id": None, "associated_at": None}}
@@ -766,35 +431,35 @@ async def create_recording(recording: RecordingCreate):
         "booth_name": recording.booth_name,
         "start_time": datetime.utcnow(),
         "end_time": None,
-        "duration": None,
+        "duration": 0,
         "status": "recording",
         "has_video": False,
         "has_audio": False,
         "video_file_id": None,
         "audio_file_id": None,
         "transcript": None,
-        "translated_transcript": None,
         "summary": None,
         "highlights": [],
-        "barcode_scans": []
+        "barcode_scans": [],
+        "visitors": [],  # List of visitor badges
+        "top_questions": [],
+        "top_topics": [],
+        "overall_sentiment": "neutral"
     }
     result = await db.recordings.insert_one(recording_doc)
     recording_doc['_id'] = result.inserted_id
     return serialize_doc(recording_doc)
 
 @api_router.get("/recordings")
-async def get_recordings(device_id: Optional[str] = None, limit: int = 50):
+async def get_recordings(device_id: Optional[str] = None):
     """Get all recordings, optionally filtered by device"""
-    query = {}
-    if device_id:
-        query["device_id"] = device_id
-    
-    recordings = await db.recordings.find(query).sort("start_time", -1).limit(limit).to_list(limit)
+    query = {"device_id": device_id} if device_id else {}
+    recordings = await db.recordings.find(query).sort("start_time", -1).to_list(100)
     return [serialize_doc(r) for r in recordings]
 
 @api_router.get("/recordings/{recording_id}")
 async def get_recording(recording_id: str):
-    """Get a specific recording"""
+    """Get a specific recording by ID"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
@@ -836,27 +501,21 @@ async def delete_recording(recording_id: str):
         if not recording:
             raise HTTPException(status_code=404, detail="Recording not found")
         
-        # Delete video file from GridFS if exists
         if recording.get('video_file_id'):
             try:
                 await fs_bucket.delete(ObjectId(recording['video_file_id']))
             except Exception as e:
                 logger.warning(f"Failed to delete video file: {e}")
         
-        # Delete audio file from GridFS if exists
         if recording.get('audio_file_id'):
             try:
                 await fs_bucket.delete(ObjectId(recording['audio_file_id']))
             except Exception as e:
                 logger.warning(f"Failed to delete audio file: {e}")
         
-        # Delete associated barcode scans
         await db.barcode_scans.delete_many({"recording_id": recording_id})
-        
-        # Delete video chunks if any
         await db.video_chunks.delete_many({"recording_id": recording_id})
-        
-        # Delete the recording document
+        await db.visitor_badges.delete_many({"recording_id": recording_id})
         await db.recordings.delete_one({"_id": ObjectId(recording_id)})
         
         return {"success": True, "message": "Recording deleted successfully"}
@@ -874,13 +533,11 @@ async def reprocess_recording(recording_id: str, background_tasks: BackgroundTas
         if not recording.get('audio_file_id'):
             raise HTTPException(status_code=400, detail="No audio file found for this recording")
         
-        # Reset status to processing
         await db.recordings.update_one(
             {"_id": ObjectId(recording_id)},
             {"$set": {"status": "processing"}}
         )
         
-        # Start background processing with diarization
         background_tasks.add_task(process_transcription_with_diarization, recording_id)
         
         return {"success": True, "message": "Reprocessing started with speaker diarization", "status": "processing"}
@@ -898,89 +555,31 @@ async def add_manual_transcript(recording_id: str, request: ManualTranscriptRequ
         if not recording:
             raise HTTPException(status_code=404, detail="Recording not found")
         
-        # Update with manual transcript
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {"transcript": request.transcript, "status": "processing"}}
-        )
-        
-        # Trigger AI analysis in background
-        background_tasks.add_task(process_transcript_analysis, recording_id, request.transcript)
-        
-        return {"success": True, "message": "Transcript added, AI analysis started"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-async def process_transcript_analysis(recording_id: str, transcript: str):
-    """Process transcript with AI for summarization, conversation detection, and speaker diarization"""
-    try:
-        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
-        if not recording:
-            return
-        
-        duration = recording.get('duration', 0) or 0
-        barcode_scans = recording.get('barcode_scans', []) or []
-        
-        # Summarize
-        analysis = await summarize_text(transcript)
-        
-        # Perform speaker diarization
-        diarization_result = await perform_speaker_diarization(transcript, barcode_scans, duration)
-        
-        # Detect and segment conversations
-        conversation_data = await detect_conversations(transcript, duration)
-        conversations = conversation_data.get('conversations', []) if isinstance(conversation_data, dict) else []
-        
-        for conv in conversations:
-            if isinstance(conv, dict):
-                conv_start = conv.get('start_time', 0) or 0
-                conv_end = conv.get('end_time', duration) or duration
-                matching_barcodes = []
-                for scan in barcode_scans:
-                    if isinstance(scan, dict):
-                        scan_ts = scan.get('video_timestamp', 0) or 0
-                        if conv_start - 5 <= scan_ts <= conv_end + 5:
-                            matching_barcodes.append(scan.get('barcode_data', ''))
-                conv['associated_barcodes'] = matching_barcodes
-        
-        # Update recording with all data including speaker diarization
         await db.recordings.update_one(
             {"_id": ObjectId(recording_id)},
             {"$set": {
-                "summary": analysis.get('summary', '') if isinstance(analysis, dict) else '',
-                "highlights": analysis.get('highlights', []) if isinstance(analysis, dict) else [],
-                "visitor_interests": analysis.get('visitor_interests', []) if isinstance(analysis, dict) else [],
-                "key_questions": analysis.get('key_questions', []) if isinstance(analysis, dict) else [],
-                # Speaker diarization data
-                "speakers": diarization_result.get('speakers', []),
-                "overall_summary": diarization_result.get('overall_summary', ''),
-                "host_identified": diarization_result.get('host_identified', False),
-                "follow_up_actions": diarization_result.get('follow_up_actions', []),
-                "total_speakers": diarization_result.get('total_speakers', 0),
-                # Conversation data
-                "conversations": conversations,
-                "total_interactions": conversation_data.get('total_interactions', 0) if isinstance(conversation_data, dict) else 0,
-                "main_topics": diarization_result.get('main_topics', []) or conversation_data.get('main_topics', []),
-                "status": "processed"
+                "transcript": request.transcript,
+                "status": "processing"
             }}
         )
         
-        logger.info(f"Manual transcript analysis with diarization completed for recording {recording_id}")
+        background_tasks.add_task(process_diarization_only, recording_id, request.transcript)
+        
+        return {"success": True, "message": "Transcript added, analysis started"}
     except Exception as e:
-        logger.error(f"Manual transcript analysis error: {e}")
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {"status": "error", "error_message": str(e)}}
-        )
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ==================== VIDEO/AUDIO UPLOAD ====================
 
 @api_router.post("/recordings/{recording_id}/upload-video")
 async def upload_video(
     recording_id: str,
     video: UploadFile = File(...),
     chunk_index: int = Form(0),
-    total_chunks: int = Form(1)
+    total_chunks: int = Form(1),
+    background_tasks: BackgroundTasks = None
 ):
-    """Upload video file for a recording (supports chunked uploads)"""
+    """Upload video file for a recording - extracts audio for transcription"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
@@ -988,11 +587,9 @@ async def upload_video(
         
         video_data = await video.read()
         
-        # Detect video format from filename or content type
         filename = video.filename or "recording.mp4"
         content_type = video.content_type or "video/mp4"
         
-        # Determine file extension based on content type
         if "mp4" in content_type or filename.endswith(".mp4"):
             ext = "mp4"
             mime = "video/mp4"
@@ -1003,11 +600,11 @@ async def upload_video(
             ext = "mov"
             mime = "video/quicktime"
         else:
-            ext = "mp4"  # Default to mp4
+            ext = "mp4"
             mime = "video/mp4"
         
         if total_chunks == 1:
-            # Single upload - store directly
+            # Single upload - store video
             video_id = await fs_bucket.upload_from_stream(
                 f"video_{recording_id}.{ext}",
                 io.BytesIO(video_data),
@@ -1020,11 +617,16 @@ async def upload_video(
                     "video_file_id": str(video_id),
                     "has_video": True,
                     "video_mime_type": mime,
-                    "status": "uploaded"
+                    "status": "processing"
                 }}
             )
+            
+            # Extract audio from video and process
+            if background_tasks:
+                background_tasks.add_task(process_video_audio, recording_id, video_data, ext)
+            
         else:
-            # Chunked upload - store chunk
+            # Chunked upload
             await db.video_chunks.insert_one({
                 "recording_id": recording_id,
                 "chunk_index": chunk_index,
@@ -1035,10 +637,8 @@ async def upload_video(
                 "extension": ext
             })
             
-            # Check if all chunks uploaded
             chunks_count = await db.video_chunks.count_documents({"recording_id": recording_id})
             if chunks_count == total_chunks:
-                # Combine chunks
                 chunks = await db.video_chunks.find(
                     {"recording_id": recording_id}
                 ).sort("chunk_index", 1).to_list(total_chunks)
@@ -1047,7 +647,6 @@ async def upload_video(
                     base64.b64decode(c['data']) for c in chunks
                 ])
                 
-                # Get mime type from first chunk
                 first_chunk = chunks[0] if chunks else {}
                 mime = first_chunk.get('mime_type', 'video/mp4')
                 ext = first_chunk.get('extension', 'mp4')
@@ -1064,18 +663,59 @@ async def upload_video(
                         "video_file_id": str(video_id),
                         "has_video": True,
                         "video_mime_type": mime,
-                        "status": "uploaded"
+                        "status": "processing"
                     }}
                 )
                 
-                # Clean up chunks
                 await db.video_chunks.delete_many({"recording_id": recording_id})
+                
+                # Extract audio and process
+                if background_tasks:
+                    background_tasks.add_task(process_video_audio, recording_id, combined_data, ext)
         
         logger.info(f"Video uploaded for recording {recording_id}: {ext} ({mime})")
-        return {"success": True, "message": f"Chunk {chunk_index + 1}/{total_chunks} uploaded", "format": mime}
+        return {"success": True, "message": f"Video uploaded, extracting audio for analysis", "format": mime}
     except Exception as e:
         logger.error(f"Video upload error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
+
+async def process_video_audio(recording_id: str, video_data: bytes, video_format: str):
+    """Extract audio from video and process transcription"""
+    try:
+        logger.info(f"Extracting audio from video for recording {recording_id}")
+        
+        audio_data = await extract_audio_from_video(video_data, video_format)
+        
+        if audio_data:
+            # Store extracted audio
+            audio_id = await fs_bucket.upload_from_stream(
+                f"audio_{recording_id}.m4a",
+                io.BytesIO(audio_data),
+                metadata={"recording_id": recording_id, "type": "audio", "extracted_from_video": True}
+            )
+            
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {
+                    "audio_file_id": str(audio_id),
+                    "has_audio": True
+                }}
+            )
+            
+            # Process transcription
+            await process_transcription_with_diarization(recording_id)
+        else:
+            logger.error(f"Failed to extract audio from video for recording {recording_id}")
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {"status": "uploaded", "error": "Audio extraction failed"}}
+            )
+    except Exception as e:
+        logger.error(f"Error processing video audio: {e}")
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {"status": "error", "error": str(e)}}
+        )
 
 @api_router.post("/recordings/{recording_id}/upload-audio")
 async def upload_audio(recording_id: str, audio: UploadFile = File(...), background_tasks: BackgroundTasks = None):
@@ -1088,7 +728,7 @@ async def upload_audio(recording_id: str, audio: UploadFile = File(...), backgro
         audio_data = await audio.read()
         
         audio_id = await fs_bucket.upload_from_stream(
-            f"audio_{recording_id}.webm",
+            f"audio_{recording_id}.m4a",
             io.BytesIO(audio_data),
             metadata={"recording_id": recording_id, "type": "audio"}
         )
@@ -1102,53 +742,445 @@ async def upload_audio(recording_id: str, audio: UploadFile = File(...), backgro
             }}
         )
         
-        # Automatically trigger transcription and AI analysis
         if background_tasks:
             background_tasks.add_task(process_transcription_with_diarization, recording_id)
         
-        return {"success": True, "audio_id": str(audio_id), "message": "Audio uploaded, transcription started automatically"}
+        return {"success": True, "message": "Audio uploaded, transcription started"}
+    except Exception as e:
+        logger.error(f"Audio upload error: {e}")
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ==================== TRANSCRIPTION & ANALYSIS ====================
+
+async def process_transcription_with_diarization(recording_id: str):
+    """Process audio with Whisper transcription and GPT-powered speaker diarization"""
+    try:
+        logger.info(f"Starting transcription for recording {recording_id}")
+        
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        if not recording or not recording.get('audio_file_id'):
+            logger.error(f"Recording or audio file not found: {recording_id}")
+            return
+        
+        # Get audio data from GridFS
+        grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
+        audio_data = await grid_out.read()
+        
+        # Transcribe with Whisper
+        transcript = ""
+        if whisper_client:
+            try:
+                audio_file = io.BytesIO(audio_data)
+                audio_file.name = "audio.m4a"
+                
+                response = whisper_client.audio.transcriptions.create(
+                    model="whisper-1",
+                    file=audio_file,
+                    response_format="text"
+                )
+                transcript = response if isinstance(response, str) else str(response)
+                logger.info(f"Transcription completed: {len(transcript)} characters")
+            except Exception as e:
+                logger.error(f"Whisper transcription error: {e}")
+                transcript = ""
+        
+        if transcript:
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {"transcript": transcript}}
+            )
+            
+            # Process with GPT for diarization and visitor extraction
+            logger.info(f"Performing speaker diarization for recording {recording_id}")
+            await perform_advanced_diarization(recording_id, transcript, recording.get('duration', 0))
+        else:
+            await db.recordings.update_one(
+                {"_id": ObjectId(recording_id)},
+                {"$set": {
+                    "status": "completed",
+                    "summary": "No speech detected in audio",
+                    "overall_summary": "No speech detected in audio"
+                }}
+            )
+            
+    except Exception as e:
+        logger.error(f"Transcription processing error: {e}")
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {"status": "error", "error": str(e)}}
+        )
+
+async def process_diarization_only(recording_id: str, transcript: str):
+    """Process only the diarization step for manual transcripts"""
+    try:
+        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
+        duration = recording.get('duration', 0) if recording else 0
+        await perform_advanced_diarization(recording_id, transcript, duration)
+    except Exception as e:
+        logger.error(f"Diarization error: {e}")
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {"status": "error", "error": str(e)}}
+        )
+
+async def perform_advanced_diarization(recording_id: str, transcript: str, duration: float):
+    """Use GPT to perform advanced speaker diarization and create visitor badges"""
+    if not openai_client:
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {
+                "status": "completed",
+                "summary": transcript[:500] if transcript else "No transcript available"
+            }}
+        )
+        return
+    
+    try:
+        # Get any barcode scans for this recording
+        barcode_scans = await db.barcode_scans.find({"recording_id": recording_id}).to_list(100)
+        barcode_info = ""
+        if barcode_scans:
+            barcode_list = [f"- {b['barcode_data']} at {b.get('video_timestamp', 0):.1f}s" for b in barcode_scans]
+            barcode_info = f"\n\nBarcode scans during recording:\n" + "\n".join(barcode_list)
+        
+        # Step 1: Get overall analysis
+        analysis_prompt = f"""Analyze this expo booth conversation transcript and provide:
+
+TRANSCRIPT:
+{transcript}
+{barcode_info}
+
+Provide a JSON response with:
+{{
+    "overall_summary": "2-3 sentence summary of the entire conversation",
+    "top_questions": ["list of most important questions asked by visitors"],
+    "top_topics": ["list of main topics discussed"],
+    "overall_sentiment": "positive/neutral/negative",
+    "key_insights": ["important insights for follow-up"],
+    "visitor_count_estimate": number
+}}"""
+
+        analysis_response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": analysis_prompt}],
+            response_format={"type": "json_object"}
+        )
+        
+        analysis = json.loads(analysis_response.choices[0].message.content)
+        
+        # Step 2: Get speaker segments and visitor badges
+        diarization_prompt = f"""Analyze this expo booth conversation and identify distinct speakers/visitors.
+For each visitor interaction, create a visitor badge.
+
+TRANSCRIPT:
+{transcript}
+{barcode_info}
+
+Recording duration: {duration:.1f} seconds
+
+Create a JSON response:
+{{
+    "speakers": [
+        {{
+            "speaker_id": "unique_id",
+            "is_host": true/false,
+            "label": "Host" or visitor name if mentioned or barcode if provided,
+            "company": "company name if mentioned",
+            "role": "role if mentioned",
+            "sentiment": "positive/interested/neutral/skeptical/negative",
+            "topics_discussed": ["topic1", "topic2"],
+            "key_points": ["main point 1", "main point 2"],
+            "questions_asked": ["question 1", "question 2"],
+            "start_percent": 0-100,
+            "end_percent": 0-100,
+            "dialogue_segments": [
+                {{"content": "what they said", "start_percent": 0-100, "end_percent": 0-100}}
+            ]
+        }}
+    ],
+    "conversations": [
+        {{
+            "title": "Topic discussed",
+            "start_percent": 0-100,
+            "summary": "Brief summary"
+        }}
+    ]
+}}
+
+Rules:
+- First speaker is usually the HOST (booth staff)
+- Each visitor is a separate speaker
+- Link barcodes to speakers if scanned during their segment
+- Estimate time percentages based on transcript position"""
+
+        diarization_response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{"role": "user", "content": diarization_prompt}],
+            response_format={"type": "json_object"}
+        )
+        
+        diarization = json.loads(diarization_response.choices[0].message.content)
+        
+        # Step 3: Create visitor badges from non-host speakers
+        visitors = []
+        visitor_badges = []
+        
+        for speaker in diarization.get('speakers', []):
+            if not speaker.get('is_host', False):
+                # Create visitor badge
+                badge_id = speaker.get('label', f"Visitor_{len(visitors)+1}")
+                
+                # Check if barcode was scanned for this visitor
+                is_barcode = any(b['barcode_data'] == badge_id for b in barcode_scans)
+                
+                start_time = (speaker.get('start_percent', 0) / 100) * duration
+                end_time = (speaker.get('end_percent', 100) / 100) * duration
+                
+                visitor_badge = {
+                    "badge_id": badge_id,
+                    "recording_id": recording_id,
+                    "visitor_label": badge_id,
+                    "start_time": start_time,
+                    "end_time": end_time,
+                    "summary": f"Discussed: {', '.join(speaker.get('topics_discussed', [])[:2])}",
+                    "topics": speaker.get('topics_discussed', []),
+                    "questions_asked": speaker.get('questions_asked', []),
+                    "sentiment": speaker.get('sentiment', 'neutral'),
+                    "key_points": speaker.get('key_points', []),
+                    "is_barcode_linked": is_barcode,
+                    "company": speaker.get('company'),
+                    "role": speaker.get('role'),
+                    "created_at": datetime.utcnow()
+                }
+                
+                visitor_badges.append(visitor_badge)
+                visitors.append(visitor_badge)
+        
+        # Store visitor badges in separate collection
+        if visitor_badges:
+            await db.visitor_badges.insert_many(visitor_badges)
+        
+        # Add timestamp information to speakers
+        for speaker in diarization.get('speakers', []):
+            start_pct = speaker.get('start_percent', 0)
+            end_pct = speaker.get('end_percent', 100)
+            speaker['start_time'] = (start_pct / 100) * duration
+            speaker['end_time'] = (end_pct / 100) * duration
+            
+            for seg in speaker.get('dialogue_segments', []):
+                seg_start = seg.get('start_percent', 0)
+                seg_end = seg.get('end_percent', 100)
+                seg['start_time'] = (seg_start / 100) * duration
+                seg['end_time'] = (seg_end / 100) * duration
+                seg['timestamp_label'] = f"{int(seg['start_time']//60)}:{int(seg['start_time']%60):02d}"
+        
+        # Add timestamp info to conversations
+        for conv in diarization.get('conversations', []):
+            start_pct = conv.get('start_percent', 0)
+            conv['start_time'] = (start_pct / 100) * duration
+        
+        # Update recording with all data
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {
+                "status": "processed",
+                "overall_summary": analysis.get('overall_summary', ''),
+                "summary": analysis.get('overall_summary', ''),
+                "top_questions": analysis.get('top_questions', []),
+                "top_topics": analysis.get('top_topics', []),
+                "overall_sentiment": analysis.get('overall_sentiment', 'neutral'),
+                "key_insights": analysis.get('key_insights', []),
+                "visitor_count": len(visitors),
+                "visitors": visitors,
+                "speakers": diarization.get('speakers', []),
+                "conversations": diarization.get('conversations', []),
+                "total_speakers": len(diarization.get('speakers', [])),
+                "host_identified": any(s.get('is_host') for s in diarization.get('speakers', []))
+            }}
+        )
+        
+        logger.info(f"Transcription with diarization completed for recording {recording_id}")
+        
+    except Exception as e:
+        logger.error(f"Diarization error: {e}")
+        await db.recordings.update_one(
+            {"_id": ObjectId(recording_id)},
+            {"$set": {
+                "status": "processed",
+                "summary": transcript[:500] if transcript else "Analysis failed",
+                "error": str(e)
+            }}
+        )
+
+# ==================== VISITOR BADGE ENDPOINTS ====================
+
+@api_router.get("/visitors")
+async def get_all_visitors():
+    """Get all visitor badges across all recordings"""
+    visitors = await db.visitor_badges.find({}).sort("created_at", -1).to_list(500)
+    return [serialize_doc(v) for v in visitors]
+
+@api_router.get("/visitors/recording/{recording_id}")
+async def get_recording_visitors(recording_id: str):
+    """Get all visitor badges for a specific recording"""
+    visitors = await db.visitor_badges.find({"recording_id": recording_id}).to_list(100)
+    return [serialize_doc(v) for v in visitors]
+
+@api_router.get("/visitors/{visitor_id}")
+async def get_visitor(visitor_id: str):
+    """Get a specific visitor badge"""
+    try:
+        visitor = await db.visitor_badges.find_one({"_id": ObjectId(visitor_id)})
+        if not visitor:
+            raise HTTPException(status_code=404, detail="Visitor not found")
+        return serialize_doc(visitor)
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
+# ==================== BARCODE ENDPOINTS ====================
+
+@api_router.post("/barcodes")
+async def create_barcode_scan(barcode: BarcodeCreate):
+    """Record a barcode scan during recording"""
+    barcode_doc = {
+        "recording_id": barcode.recording_id,
+        "barcode_data": barcode.barcode_data,
+        "video_timestamp": barcode.video_timestamp,
+        "frame_code": barcode.frame_code,
+        "scan_time": datetime.utcnow()
+    }
+    result = await db.barcode_scans.insert_one(barcode_doc)
+    
+    # Also update the recording document
+    await db.recordings.update_one(
+        {"_id": ObjectId(barcode.recording_id)},
+        {"$push": {"barcode_scans": barcode_doc}}
+    )
+    
+    barcode_doc['_id'] = result.inserted_id
+    return serialize_doc(barcode_doc)
+
+# ==================== DASHBOARD DATA ENDPOINTS ====================
+
+@api_router.get("/dashboard/insights")
+async def get_dashboard_insights():
+    """Get aggregated insights for the dashboard"""
+    recordings = await db.recordings.find({}).to_list(1000)
+    visitors = await db.visitor_badges.find({}).to_list(1000)
+    
+    total_recordings = len(recordings)
+    total_visitors = len(visitors)
+    total_duration = sum(r.get('duration', 0) for r in recordings)
+    
+    # Aggregate top topics across all recordings
+    all_topics = []
+    all_questions = []
+    for r in recordings:
+        all_topics.extend(r.get('top_topics', []))
+        all_questions.extend(r.get('top_questions', []))
+    
+    # Count topic frequency
+    topic_counts = {}
+    for topic in all_topics:
+        topic_counts[topic] = topic_counts.get(topic, 0) + 1
+    top_topics = sorted(topic_counts.keys(), key=lambda x: topic_counts[x], reverse=True)[:10]
+    
+    # Count question frequency
+    question_counts = {}
+    for q in all_questions:
+        question_counts[q] = question_counts.get(q, 0) + 1
+    top_questions = sorted(question_counts.keys(), key=lambda x: question_counts[x], reverse=True)[:5]
+    
+    recent_activity = []
+    for r in sorted(recordings, key=lambda x: x.get('start_time', datetime.min), reverse=True)[:5]:
+        recent_activity.append({
+            "id": str(r['_id']),
+            "booth_name": r.get('booth_name', 'Unknown'),
+            "start_time": r.get('start_time'),
+            "duration": r.get('duration', 0),
+            "status": r.get('status', 'unknown'),
+            "total_interactions": r.get('visitor_count', len(r.get('visitors', [])))
+        })
+    
+    return {
+        "total_recordings": total_recordings,
+        "total_visitors": total_visitors,
+        "total_duration_hours": total_duration / 3600,
+        "top_topics": top_topics,
+        "top_questions": top_questions,
+        "recent_activity": recent_activity
+    }
+
+@api_router.get("/dashboard/recordings")
+async def get_dashboard_recordings():
+    """Get all recordings for the dashboard with full details"""
+    recordings = await db.recordings.find({}).sort("start_time", -1).to_list(100)
+    result = []
+    
+    for r in recordings:
+        rec_data = serialize_doc(r)
+        
+        # Get visitor badges for this recording
+        visitors = await db.visitor_badges.find({"recording_id": str(r['_id'])}).to_list(50)
+        rec_data['visitor_badges'] = [serialize_doc(v) for v in visitors]
+        
+        result.append(rec_data)
+    
+    return result
+
+@api_router.get("/dashboard/visitors")
+async def get_dashboard_visitors():
+    """Get all visitors with their recording info"""
+    visitors = await db.visitor_badges.find({}).sort("created_at", -1).to_list(500)
+    result = []
+    
+    for v in visitors:
+        visitor_data = serialize_doc(v)
+        
+        # Get recording info
+        if v.get('recording_id'):
+            recording = await db.recordings.find_one({"_id": ObjectId(v['recording_id'])})
+            if recording:
+                visitor_data['booth_name'] = recording.get('booth_name')
+                visitor_data['recording_date'] = recording.get('start_time')
+        
+        result.append(visitor_data)
+    
+    return result
+
+# ==================== MEDIA STREAMING ====================
+
 @api_router.get("/recordings/{recording_id}/video")
 async def get_video(recording_id: str, request: Request):
-    """Stream video file with proper MIME type and range support"""
+    """Stream video file with range support"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording or not recording.get('video_file_id'):
             raise HTTPException(status_code=404, detail="Video not found")
         
-        # Get file info for size and metadata
         file_info = await db.fs.files.find_one({"_id": ObjectId(recording['video_file_id'])})
         file_size = file_info.get('length', 0) if file_info else 0
         
-        # Get MIME type from recording or file metadata
         mime_type = recording.get('video_mime_type')
         if not mime_type and file_info:
             mime_type = file_info.get('metadata', {}).get('mime_type', 'video/mp4')
         if not mime_type:
-            mime_type = 'video/mp4'  # Default
+            mime_type = 'video/mp4'
         
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['video_file_id']))
         
-        # Check for Range header for seeking support
         range_header = request.headers.get('range')
         
         if range_header and file_size > 0:
-            # Parse range header
             range_match = range_header.replace('bytes=', '').split('-')
             start = int(range_match[0]) if range_match[0] else 0
             end = int(range_match[1]) if len(range_match) > 1 and range_match[1] else file_size - 1
             
-            # Ensure valid range
             start = max(0, min(start, file_size - 1))
             end = max(start, min(end, file_size - 1))
             
-            # Seek to start position (sync method in motor GridFS)
             grid_out.seek(start)
             content_length = end - start + 1
-            
-            # Read the requested range
             content = await grid_out.read(content_length)
             
             return Response(
@@ -1158,21 +1190,17 @@ async def get_video(recording_id: str, request: Request):
                 headers={
                     "Content-Range": f"bytes {start}-{end}/{file_size}",
                     "Accept-Ranges": "bytes",
-                    "Content-Length": str(content_length),
-                    "Content-Disposition": f"inline; filename=video_{recording_id}.mp4"
+                    "Content-Length": str(content_length)
                 }
             )
         else:
-            # No range requested - stream entire file
             content = await grid_out.read()
-            
             return Response(
                 content=content,
                 media_type=mime_type,
                 headers={
                     "Accept-Ranges": "bytes",
-                    "Content-Length": str(file_size),
-                    "Content-Disposition": f"inline; filename=video_{recording_id}.mp4"
+                    "Content-Length": str(file_size)
                 }
             )
     except HTTPException:
@@ -1189,338 +1217,104 @@ async def get_audio(recording_id: str, request: Request):
         if not recording or not recording.get('audio_file_id'):
             raise HTTPException(status_code=404, detail="Audio not found")
         
-        # Get file info for size
         file_info = await db.fs.files.find_one({"_id": ObjectId(recording['audio_file_id'])})
         file_size = file_info.get('length', 0) if file_info else 0
         
         grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
         
-        # Read first 32 bytes to detect actual format
-        header = await grid_out.read(32)
+        range_header = request.headers.get('range')
         
-        # Detect content type from file signature (magic bytes)
-        content_type = "audio/mp4"  # Default for mobile recordings
-        
-        if header[:4] == b'RIFF':
-            content_type = "audio/wav"
-        elif header[:3] == b'ID3' or header[:2] == b'\xff\xfb':
-            content_type = "audio/mpeg"
-        elif header[:4] == b'OggS':
-            content_type = "audio/ogg"
-        elif header[:4] == b'\x1aE\xdf\xa3':
-            content_type = "audio/webm"
-        elif b'ftyp' in header[:12]:
-            # MP4/M4A format - use audio/aac for better browser compatibility
-            content_type = "audio/aac"
-        
-        # Reopen stream to start from beginning
-        grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
-        
-        # Read full content for non-streaming response (better browser compatibility)
-        content = await grid_out.read()
-        
-        return Response(
-            content=content,
-            media_type=content_type,
-            headers={
-                "Content-Disposition": f"inline; filename=audio_{recording_id}.m4a",
-                "Content-Length": str(len(content)),
-                "Accept-Ranges": "bytes"
-            }
-        )
+        if range_header and file_size > 0:
+            range_match = range_header.replace('bytes=', '').split('-')
+            start = int(range_match[0]) if range_match[0] else 0
+            end = int(range_match[1]) if len(range_match) > 1 and range_match[1] else file_size - 1
+            
+            start = max(0, min(start, file_size - 1))
+            end = max(start, min(end, file_size - 1))
+            
+            grid_out.seek(start)
+            content_length = end - start + 1
+            content = await grid_out.read(content_length)
+            
+            return Response(
+                content=content,
+                status_code=206,
+                media_type="audio/mp4",
+                headers={
+                    "Content-Range": f"bytes {start}-{end}/{file_size}",
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(content_length)
+                }
+            )
+        else:
+            content = await grid_out.read()
+            return Response(
+                content=content,
+                media_type="audio/mp4",
+                headers={
+                    "Accept-Ranges": "bytes",
+                    "Content-Length": str(file_size)
+                }
+            )
+    except HTTPException:
+        raise
     except Exception as e:
+        logger.error(f"Audio streaming error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
 
 @api_router.get("/recordings/{recording_id}/status")
 async def get_recording_status(recording_id: str):
-    """Get recording processing status"""
+    """Get the current status of a recording"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
             raise HTTPException(status_code=404, detail="Recording not found")
-        
-        return {
-            "id": recording_id,
-            "status": recording.get('status', 'unknown'),
-            "has_audio": recording.get('has_audio', False),
-            "has_video": recording.get('has_video', False),
-            "has_transcript": bool(recording.get('transcript')),
-            "has_summary": bool(recording.get('summary')),
-            "total_conversations": len(recording.get('conversations', []))
-        }
+        return {"status": recording.get('status', 'unknown')}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
-
-# ==================== BARCODE ENDPOINTS ====================
-
-@api_router.post("/barcodes")
-async def create_barcode_scan(scan: BarcodeScanCreate):
-    """Log a barcode scan"""
-    scan_doc = {
-        "recording_id": scan.recording_id,
-        "barcode_data": scan.barcode_data,
-        "visitor_name": scan.visitor_name,
-        "scan_time": datetime.utcnow(),
-        "video_timestamp": scan.video_timestamp,
-        "frame_code": scan.frame_code
-    }
-    result = await db.barcode_scans.insert_one(scan_doc)
-    
-    # Also update the recording's barcode_scans array
-    await db.recordings.update_one(
-        {"_id": ObjectId(scan.recording_id)},
-        {"$push": {"barcode_scans": scan_doc}}
-    )
-    
-    scan_doc['_id'] = result.inserted_id
-    return serialize_doc(scan_doc)
-
-@api_router.get("/barcodes/{recording_id}")
-async def get_barcode_scans(recording_id: str):
-    """Get all barcode scans for a recording"""
-    scans = await db.barcode_scans.find({"recording_id": recording_id}).to_list(1000)
-    return [serialize_doc(s) for s in scans]
-
-# ==================== TRANSCRIPTION ENDPOINTS ====================
-
-@api_router.post("/recordings/{recording_id}/transcribe")
-async def transcribe_recording(recording_id: str, background_tasks: BackgroundTasks):
-    """Transcribe and analyze a recording"""
-    try:
-        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
-        if not recording:
-            raise HTTPException(status_code=404, detail="Recording not found")
-        
-        if not recording.get('audio_file_id'):
-            raise HTTPException(status_code=400, detail="No audio file found for this recording")
-        
-        # Start background processing
-        background_tasks.add_task(process_transcription, recording_id)
-        
-        return {"success": True, "message": "Transcription started", "status": "processing"}
-    except Exception as e:
-        raise HTTPException(status_code=400, detail=str(e))
-
-async def process_transcription(recording_id: str):
-    """Background task to process transcription"""
-    try:
-        recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
-        if not recording:
-            logger.error(f"Recording not found: {recording_id}")
-            return
-        
-        # Download audio
-        try:
-            grid_out = await fs_bucket.open_download_stream(ObjectId(recording['audio_file_id']))
-            audio_data = await grid_out.read()
-        except Exception as e:
-            logger.error(f"Failed to download audio: {e}")
-            await db.recordings.update_one(
-                {"_id": ObjectId(recording_id)},
-                {"$set": {"status": "error", "error_message": "Failed to download audio file"}}
-            )
-            return
-        
-        # Transcribe
-        transcript = await transcribe_audio(audio_data)
-        
-        # Get duration for conversation detection
-        duration = recording.get('duration', 0) or 0
-        
-        # If transcript is empty, still mark as processed but skip AI analysis
-        if not transcript or transcript.strip() == "":
-            await db.recordings.update_one(
-                {"_id": ObjectId(recording_id)},
-                {"$set": {
-                    "transcript": "",
-                    "summary": "No speech detected in audio",
-                    "highlights": [],
-                    "conversations": [],
-                    "status": "processed"
-                }}
-            )
-            logger.info(f"No speech detected for recording {recording_id}")
-            return
-        
-        # Summarize
-        analysis = await summarize_text(transcript)
-        
-        # Detect and segment conversations
-        conversation_data = await detect_conversations(transcript, duration)
-        
-        # Match barcode scans to conversations
-        barcode_scans = recording.get('barcode_scans', [])
-        if barcode_scans is None:
-            barcode_scans = []
-        
-        conversations = []
-        if isinstance(conversation_data, dict):
-            conversations = conversation_data.get('conversations', [])
-        
-        for conv in conversations:
-            if isinstance(conv, dict):
-                conv_start = conv.get('start_time', 0) or 0
-                conv_end = conv.get('end_time', duration) or duration
-                # Find barcodes scanned during this conversation
-                matching_barcodes = []
-                for scan in barcode_scans:
-                    if isinstance(scan, dict):
-                        scan_ts = scan.get('video_timestamp', 0) or 0
-                        if conv_start - 5 <= scan_ts <= conv_end + 5:
-                            matching_barcodes.append(scan.get('barcode_data', ''))
-                conv['associated_barcodes'] = matching_barcodes
-        
-        # Update recording
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {
-                "transcript": transcript,
-                "summary": analysis.get('summary', '') if isinstance(analysis, dict) else '',
-                "highlights": analysis.get('highlights', []) if isinstance(analysis, dict) else [],
-                "visitor_interests": analysis.get('visitor_interests', []) if isinstance(analysis, dict) else [],
-                "key_questions": analysis.get('key_questions', []) if isinstance(analysis, dict) else [],
-                "conversations": conversations,
-                "total_interactions": conversation_data.get('total_interactions', 0) if isinstance(conversation_data, dict) else 0,
-                "main_topics": conversation_data.get('main_topics', []) if isinstance(conversation_data, dict) else [],
-                "status": "processed"
-            }}
-        )
-        
-        logger.info(f"Transcription completed for recording {recording_id}")
-    except Exception as e:
-        logger.error(f"Transcription processing error: {e}")
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {"status": "error", "error_message": str(e)}}
-        )
 
 @api_router.post("/recordings/{recording_id}/translate")
-async def translate_recording(recording_id: str, target_language: str = "en"):
-    """Translate a recording's transcript"""
+async def translate_transcript(recording_id: str, target_language: str = "en"):
+    """Translate a recording's transcript to another language"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
             raise HTTPException(status_code=404, detail="Recording not found")
         
-        if not recording.get('transcript'):
-            raise HTTPException(status_code=400, detail="No transcript found")
+        transcript = recording.get('transcript')
+        if not transcript:
+            raise HTTPException(status_code=400, detail="No transcript available")
         
-        translated = await translate_text(recording['transcript'], target_language)
+        if not openai_client:
+            raise HTTPException(status_code=500, detail="Translation service not available")
         
-        await db.recordings.update_one(
-            {"_id": ObjectId(recording_id)},
-            {"$set": {"translated_transcript": translated}}
+        response = openai_client.chat.completions.create(
+            model="gpt-4o",
+            messages=[{
+                "role": "user",
+                "content": f"Translate the following text to {target_language}. Only return the translation, no explanations:\n\n{transcript}"
+            }]
         )
         
-        return {"success": True, "translated_transcript": translated}
+        translated = response.choices[0].message.content
+        
+        return {
+            "success": True,
+            "original_transcript": transcript,
+            "translated_transcript": translated,
+            "target_language": target_language
+        }
+    except HTTPException:
+        raise
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ==================== DASHBOARD ENDPOINTS ====================
-
-@api_router.get("/dashboard/insights")
-async def get_dashboard_insights():
-    """Get overall dashboard insights"""
-    try:
-        # Total recordings
-        total_recordings = await db.recordings.count_documents({})
-        
-        # Total visitors (unique barcode scans)
-        pipeline = [
-            {"$group": {"_id": "$barcode_data"}},
-            {"$count": "total"}
-        ]
-        visitor_result = await db.barcode_scans.aggregate(pipeline).to_list(1)
-        total_visitors = visitor_result[0]['total'] if visitor_result else 0
-        
-        # Total duration
-        pipeline = [
-            {"$match": {"duration": {"$ne": None}}},
-            {"$group": {"_id": None, "total_duration": {"$sum": "$duration"}}}
-        ]
-        duration_result = await db.recordings.aggregate(pipeline).to_list(1)
-        total_duration_hours = (duration_result[0]['total_duration'] / 3600) if duration_result else 0
-        
-        # Get top topics from highlights
-        pipeline = [
-            {"$unwind": "$highlights"},
-            {"$group": {"_id": "$highlights", "count": {"$sum": 1}}},
-            {"$sort": {"count": -1}},
-            {"$limit": 10}
-        ]
-        topics_result = await db.recordings.aggregate(pipeline).to_list(10)
-        top_topics = [t['_id'] for t in topics_result]
-        
-        # Recent activity
-        recent = await db.recordings.find().sort("start_time", -1).limit(5).to_list(5)
-        recent_activity = [serialize_doc(r) for r in recent]
-        
-        return {
-            "total_recordings": total_recordings,
-            "total_visitors": total_visitors,
-            "total_duration_hours": round(total_duration_hours, 2),
-            "top_topics": top_topics,
-            "recent_activity": recent_activity
-        }
-    except Exception as e:
-        logger.error(f"Dashboard insights error: {e}")
-        return {
-            "total_recordings": 0,
-            "total_visitors": 0,
-            "total_duration_hours": 0,
-            "top_topics": [],
-            "recent_activity": []
-        }
-
-@api_router.get("/dashboard/recordings")
-async def get_dashboard_recordings(
-    expo_name: Optional[str] = None,
-    status: Optional[str] = None,
-    limit: int = 50
-):
-    """Get recordings for dashboard with filters"""
-    query = {}
-    if expo_name:
-        query["expo_name"] = expo_name
-    if status:
-        query["status"] = status
-    
-    recordings = await db.recordings.find(query).sort("start_time", -1).limit(limit).to_list(limit)
-    
-    result = []
-    for r in recordings:
-        rec = serialize_doc(r)
-        # Get barcode scans count
-        scans_count = await db.barcode_scans.count_documents({"recording_id": rec['id']})
-        rec['scans_count'] = scans_count
-        result.append(rec)
-    
-    return result
-
-@api_router.get("/dashboard/visitors")
-async def get_visitors(recording_id: Optional[str] = None):
-    """Get visitors with their scan times"""
-    query = {}
-    if recording_id:
-        query["recording_id"] = recording_id
-    
-    scans = await db.barcode_scans.find(query).sort("scan_time", -1).to_list(1000)
-    return [serialize_doc(s) for s in scans]
-
-# ==================== HEALTH CHECK ====================
-
-@api_router.get("/")
-async def root():
-    return {"message": "XoW Expo Recording System API", "status": "online"}
-
-@api_router.get("/health")
-async def health_check():
-    return {"status": "healthy", "timestamp": datetime.utcnow().isoformat()}
+# ==================== STATIC FILES & ROUTES ====================
 
 # Include the router in the main app
 app.include_router(api_router)
 
-# Serve home page (landing page with auth)
+# Serve home page
 @app.get("/api/home")
 async def serve_home():
     return FileResponse(ROOT_DIR / "static" / "index.html")
@@ -1529,15 +1323,3 @@ async def serve_home():
 @app.get("/api/dashboard")
 async def serve_dashboard():
     return FileResponse(ROOT_DIR / "static" / "dashboard.html")
-
-app.add_middleware(
-    CORSMiddleware,
-    allow_credentials=True,
-    allow_origins=["*"],
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
-
-@app.on_event("shutdown")
-async def shutdown_db_client():
-    client.close()
