@@ -184,12 +184,21 @@ export default function RecorderScreen() {
       let audioUri: string | null = null;
       let videoUri: string | null = null;
 
-      // Stop video recording
+      // Stop video recording first and wait for it to save
       if (cameraRef.current) {
         try {
+          console.log('Stopping video recording...');
           cameraRef.current.stopRecording();
-          // Wait a bit for the video to be saved
-          await new Promise(resolve => setTimeout(resolve, 500));
+          
+          // Wait for video to be saved (the recordAsync promise will resolve)
+          // Give it up to 5 seconds to save
+          for (let i = 0; i < 50; i++) {
+            await new Promise(resolve => setTimeout(resolve, 100));
+            if (videoUriRef.current) {
+              console.log('Video saved at:', videoUriRef.current);
+              break;
+            }
+          }
           videoUri = videoUriRef.current;
         } catch (e) {
           console.log('Stop video error:', e);
@@ -201,6 +210,7 @@ export default function RecorderScreen() {
         try {
           await audioRecording.current.stopAndUnloadAsync();
           audioUri = audioRecording.current.getURI();
+          console.log('Audio saved at:', audioUri);
           audioRecording.current = null;
         } catch (e) {
           console.log('Stop audio error:', e);
@@ -212,11 +222,16 @@ export default function RecorderScreen() {
         setUploadProgress(10);
         showToast('Uploading video...');
         try {
+          console.log('Uploading video from:', videoUri);
           await uploadVideo(currentRecording.id, videoUri);
           setUploadProgress(50);
+          console.log('Video upload complete');
         } catch (e) {
           console.log('Video upload failed:', e);
+          showToast('Video upload failed', true);
         }
+      } else {
+        console.log('No video to upload');
       }
 
       // Upload audio (this triggers automatic transcription)
@@ -226,6 +241,7 @@ export default function RecorderScreen() {
         try {
           await uploadAudio(currentRecording.id, audioUri);
           setUploadProgress(90);
+          console.log('Audio upload complete');
         } catch (e) {
           console.log('Audio upload failed:', e);
         }
