@@ -210,6 +210,7 @@
             const c = document.getElementById('content');
             if (view === 'overview') c.innerHTML = renderOverview();
             else if (view === 'sessions') c.innerHTML = renderSessions();
+            else if (view === 'devices') c.innerHTML = renderDevices();
             else c.innerHTML = renderVisitors();
         }
 
