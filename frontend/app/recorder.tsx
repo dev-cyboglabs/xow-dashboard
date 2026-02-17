@@ -263,10 +263,16 @@ export default function RecorderScreen() {
       
       // Clean up local files
       if (videoUri) {
-        try { await FileSystem.deleteAsync(videoUri, { idempotent: true }); } catch {}
+        try { 
+          const videoFile = new File(videoUri);
+          if (videoFile.exists) await videoFile.delete();
+        } catch {}
       }
       if (audioUri) {
-        try { await FileSystem.deleteAsync(audioUri, { idempotent: true }); } catch {}
+        try { 
+          const audioFile = new File(audioUri);
+          if (audioFile.exists) await audioFile.delete();
+        } catch {}
       }
 
       setCurrentRecording(null);
