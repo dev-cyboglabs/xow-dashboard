@@ -132,40 +132,53 @@ export default function RecorderScreen() {
       setBarcodeCount(0);
       setRecordingTime(0);
       recordingStartTime.current = Date.now();
+      videoUriRef.current = null; // Reset video URI
       
       // Start timers for UI
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
       frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
 
       // Start video recording - the promise resolves when recording stops
-      if (cameraRef.current) {
-        console.log('Starting video recording...');
-        cameraRef.current.recordAsync({
-          maxDuration: 3600, // 1 hour max
-        }).then((videoResult) => {
-          console.log('Video recording completed:', videoResult?.uri);
-          if (videoResult?.uri) {
-            videoUriRef.current = videoResult.uri;
-          }
-        }).catch((videoErr) => {
-          console.log('Video recording error:', videoErr);
-        });
+      if (cameraRef.current && Platform.OS !== 'web') {
+        console.log('Starting video recording on', Platform.OS);
+        try {
+          cameraRef.current.recordAsync({
+            maxDuration: 3600, // 1 hour max (in seconds)
+          }).then((videoResult) => {
+            console.log('Video recording completed:', videoResult);
+            if (videoResult?.uri) {
+              videoUriRef.current = videoResult.uri;
+              console.log('Video URI saved:', videoResult.uri);
+            }
+          }).catch((videoErr: any) => {
+            console.log('Video recording error:', videoErr?.message || videoErr);
+            // On Android, video recording might fail - just continue with audio
+            Alert.alert(
+              'Video Note',
+              'Video recording may not be available on this device. Audio will still be recorded and transcribed.',
+              [{ text: 'OK' }]
+            );
+          });
+        } catch (e: any) {
+          console.log('Video recordAsync failed:', e?.message || e);
+        }
       }
 
-      // Start audio recording (as backup and for better quality transcription)
+      // Start audio recording (primary for transcription)
       try {
         const rec = new Audio.Recording();
         await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
         await rec.startAsync();
         audioRecording.current = rec;
         console.log('Audio recording started');
-      } catch (audioErr) {
-        console.log('Audio recording error:', audioErr);
+      } catch (audioErr: any) {
+        console.log('Audio recording error:', audioErr?.message || audioErr);
+        showToast('Microphone access required', true);
       }
 
       showToast('Recording started');
-    } catch (e) {
-      console.error('Start recording error:', e);
+    } catch (e: any) {
+      console.error('Start recording error:', e?.message || e);
       showToast('Failed to start recording', true);
     }
   };
