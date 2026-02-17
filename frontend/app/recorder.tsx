@@ -149,7 +149,12 @@ export default function RecorderScreen() {
   const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
   const getRecordingsDir = async () => {
-    const recordingsDir = `${FileSystem.documentDirectory}xow_recordings/`;
+    // FileSystem.documentDirectory already has trailing slash
+    const baseDir = FileSystem.documentDirectory;
+    if (!baseDir) {
+      throw new Error('Document directory not available');
+    }
+    const recordingsDir = baseDir + 'xow_recordings/';
     const dirInfo = await FileSystem.getInfoAsync(recordingsDir);
     if (!dirInfo.exists) {
       await FileSystem.makeDirectoryAsync(recordingsDir, { intermediates: true });
