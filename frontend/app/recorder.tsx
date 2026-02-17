@@ -277,23 +277,44 @@ export default function RecorderScreen() {
 
   const uploadVideo = async (recordingId: string, uri: string) => {
     const fileInfo = await FileSystem.getInfoAsync(uri);
-    if (!fileInfo.exists) return;
+    if (!fileInfo.exists) {
+      console.log('Video file does not exist:', uri);
+      throw new Error('Video file not found');
+    }
+    
+    console.log('Video file info:', fileInfo);
+    
+    // Determine file type based on URI
+    const isMovFile = uri.toLowerCase().endsWith('.mov');
+    const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
+    const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
 
     const formData = new FormData();
     formData.append('video', {
       uri,
-      type: 'video/mp4',
-      name: 'recording.mp4',
+      type: mimeType,
+      name: fileName,
     } as any);
+    formData.append('chunk_index', '0');
+    formData.append('total_chunks', '1');
 
-    await axios.post(
+    console.log('Uploading video:', { recordingId, uri, mimeType, fileName });
+    
+    const response = await axios.post(
       `${API_URL}/api/recordings/${recordingId}/upload-video`,
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
         timeout: 300000, // 5 min timeout for large videos
+        onUploadProgress: (progressEvent) => {
+          const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
+          console.log('Video upload progress:', progress.toFixed(1) + '%');
+        }
       }
     );
+    
+    console.log('Video upload response:', response.data);
+    return response.data;
   };
 
   const uploadAudio = async (recordingId: string, uri: string) => {
