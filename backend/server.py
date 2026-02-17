@@ -474,19 +474,32 @@ async def process_transcription_with_diarization(recording_id: str):
             {"$set": {"status": "error", "error_message": str(e)}}
         )
 
-# ==================== AUTH ENDPOINTS ====================
+# ==================== DASHBOARD AUTH MODELS ====================
+
+class DashboardUserCreate(BaseModel):
+    email: str
+    password: str
+    name: str
+
+class DashboardUserLogin(BaseModel):
+    email: str
+    password: str
+
+class DeviceAssociationRequest(BaseModel):
+    device_code: str  # 6-digit device ID shown on app
+
+# ==================== AUTH ENDPOINTS (Mobile App) ====================
 
 @api_router.post("/auth/register")
 async def register_device(device: DeviceCreate):
     """Register a new device"""
-    # Check if device already exists
     existing = await db.devices.find_one({"device_id": device.device_id})
     if existing:
         raise HTTPException(status_code=400, detail="Device ID already registered")
     
     device_doc = {
         "device_id": device.device_id,
-        "password": device.password,  # In production, hash this
+        "password": device.password,
         "name": device.name,
         "created_at": datetime.utcnow(),
         "is_active": True
@@ -511,6 +524,236 @@ async def login_device(login: DeviceLogin):
         "device": serialize_doc(device),
         "message": "Login successful"
     }
+
+# ==================== DASHBOARD AUTH ENDPOINTS ====================
+
+@api_router.post("/dashboard/auth/signup")
+async def dashboard_signup(user: DashboardUserCreate):
+    """Sign up a new dashboard user"""
+    import hashlib
+    
+    existing = await db.dashboard_users.find_one({"email": user.email.lower()})
+    if existing:
+        raise HTTPException(status_code=400, detail="Email already registered")
+    
+    password_hash = hashlib.sha256(user.password.encode()).hexdigest()
+    
+    user_doc = {
+        "email": user.email.lower(),
+        "password_hash": password_hash,
+        "name": user.name,
+        "created_at": datetime.utcnow(),
+        "devices": [],  # List of associated device IDs (max 10)
+        "is_active": True
+    }
+    result = await db.dashboard_users.insert_one(user_doc)
+    user_doc['_id'] = result.inserted_id
+    
+    response = serialize_doc(user_doc)
+    del response['password_hash']
+    return {"success": True, "user": response, "message": "Account created successfully"}
+
+@api_router.post("/dashboard/auth/login")
+async def dashboard_login(login: DashboardUserLogin):
+    """Login a dashboard user"""
+    import hashlib
+    
+    password_hash = hashlib.sha256(login.password.encode()).hexdigest()
+    
+    user = await db.dashboard_users.find_one({
+        "email": login.email.lower(),
+        "password_hash": password_hash
+    })
+    
+    if not user:
+        raise HTTPException(status_code=401, detail="Invalid email or password")
+    
+    response = serialize_doc(user)
+    del response['password_hash']
+    return {"success": True, "user": response, "message": "Login successful"}
+
+@api_router.get("/dashboard/auth/user/{user_id}")
+async def get_dashboard_user(user_id: str):
+    """Get dashboard user details"""
+    try:
+        user = await db.dashboard_users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        response = serialize_doc(user)
+        del response['password_hash']
+        return response
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+# ==================== DEVICE MANAGEMENT ENDPOINTS ====================
+
+@api_router.post("/dashboard/devices/add")
+async def add_device_to_dashboard(request: DeviceAssociationRequest, user_id: str):
+    """Add a device to dashboard account by generating an OTP"""
+    import random
+    
+    # Verify user exists
+    user = await db.dashboard_users.find_one({"_id": ObjectId(user_id)})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    
+    # Check device limit (max 10)
+    if len(user.get('devices', [])) >= 10:
+        raise HTTPException(status_code=400, detail="Maximum 10 devices allowed per account")
+    
+    # Check if device exists in the system (static 6-digit ID)
+    device = await db.mobile_devices.find_one({"device_code": request.device_code})
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found. Please check the 6-digit code on your app.")
+    
+    # Check if device is already associated with another dashboard
+    if device.get('dashboard_user_id'):
+        raise HTTPException(status_code=400, detail="This device is already associated with another account")
+    
+    # Generate 8-digit OTP
+    otp = ''.join([str(random.randint(0, 9)) for _ in range(8)])
+    otp_expiry = datetime.utcnow() + timedelta(minutes=10)  # OTP valid for 10 minutes
+    
+    # Store OTP in device record
+    await db.mobile_devices.update_one(
+        {"device_code": request.device_code},
+        {"$set": {
+            "pending_otp": otp,
+            "otp_expiry": otp_expiry,
+            "pending_user_id": str(user['_id'])
+        }}
+    )
+    
+    return {
+        "success": True,
+        "otp": otp,
+        "device_code": request.device_code,
+        "expires_in_minutes": 10,
+        "message": "Enter this OTP on your mobile app to complete association"
+    }
+
+@api_router.post("/mobile/verify-otp")
+async def verify_device_otp(device_code: str, otp: str):
+    """Verify OTP from mobile app to complete device association"""
+    
+    device = await db.mobile_devices.find_one({"device_code": device_code})
+    if not device:
+        raise HTTPException(status_code=404, detail="Device not found")
+    
+    # Check if OTP matches and is not expired
+    if device.get('pending_otp') != otp:
+        raise HTTPException(status_code=401, detail="Invalid OTP")
+    
+    if device.get('otp_expiry') and device['otp_expiry'] < datetime.utcnow():
+        raise HTTPException(status_code=401, detail="OTP has expired. Please request a new one.")
+    
+    pending_user_id = device.get('pending_user_id')
+    if not pending_user_id:
+        raise HTTPException(status_code=400, detail="No pending association found")
+    
+    # Associate device with dashboard user
+    await db.mobile_devices.update_one(
+        {"device_code": device_code},
+        {
+            "$set": {
+                "dashboard_user_id": pending_user_id,
+                "associated_at": datetime.utcnow()
+            },
+            "$unset": {
+                "pending_otp": "",
+                "otp_expiry": "",
+                "pending_user_id": ""
+            }
+        }
+    )
+    
+    # Add device to user's devices list
+    await db.dashboard_users.update_one(
+        {"_id": ObjectId(pending_user_id)},
+        {"$addToSet": {"devices": device_code}}
+    )
+    
+    return {
+        "success": True,
+        "message": "Device successfully associated with dashboard account"
+    }
+
+@api_router.post("/mobile/register-device")
+async def register_mobile_device(device_name: str = "Mobile Device"):
+    """Register a new mobile device and get a 6-digit static code"""
+    import random
+    
+    # Generate unique 6-digit code
+    while True:
+        device_code = ''.join([str(random.randint(0, 9)) for _ in range(6)])
+        existing = await db.mobile_devices.find_one({"device_code": device_code})
+        if not existing:
+            break
+    
+    device_doc = {
+        "device_code": device_code,
+        "device_name": device_name,
+        "created_at": datetime.utcnow(),
+        "dashboard_user_id": None,  # Not associated yet
+        "is_active": True
+    }
+    result = await db.mobile_devices.insert_one(device_doc)
+    device_doc['_id'] = result.inserted_id
+    
+    return {
+        "success": True,
+        "device_code": device_code,
+        "message": "Device registered. Use this code to connect to your dashboard account."
+    }
+
+@api_router.get("/dashboard/devices/{user_id}")
+async def get_user_devices(user_id: str):
+    """Get all devices associated with a dashboard user"""
+    try:
+        user = await db.dashboard_users.find_one({"_id": ObjectId(user_id)})
+        if not user:
+            raise HTTPException(status_code=404, detail="User not found")
+        
+        device_codes = user.get('devices', [])
+        devices = await db.mobile_devices.find({"device_code": {"$in": device_codes}}).to_list(10)
+        
+        return {
+            "success": True,
+            "devices": [
+                {
+                    "device_code": d['device_code'],
+                    "device_name": d.get('device_name', 'Unknown'),
+                    "associated_at": d.get('associated_at'),
+                    "is_active": d.get('is_active', True)
+                }
+                for d in devices
+            ],
+            "count": len(devices),
+            "max_allowed": 10
+        }
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
+
+@api_router.delete("/dashboard/devices/{user_id}/{device_code}")
+async def remove_device_from_dashboard(user_id: str, device_code: str):
+    """Remove a device from dashboard account"""
+    try:
+        # Remove from user's devices list
+        await db.dashboard_users.update_one(
+            {"_id": ObjectId(user_id)},
+            {"$pull": {"devices": device_code}}
+        )
+        
+        # Clear association in device record
+        await db.mobile_devices.update_one(
+            {"device_code": device_code},
+            {"$set": {"dashboard_user_id": None, "associated_at": None}}
+        )
+        
+        return {"success": True, "message": "Device removed successfully"}
+    except Exception as e:
+        raise HTTPException(status_code=400, detail=str(e))
 
 # ==================== RECORDING ENDPOINTS ====================
 
