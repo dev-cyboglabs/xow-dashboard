@@ -11,7 +11,7 @@ from datetime import datetime
 from typing import Dict, Any, Optional
 
 # Configuration
-BASE_URL = "https://expo-xow.preview.emergentagent.com/api"
+BASE_URL = "https://xow-expo-stalls.preview.emergentagent.com/api"
 
 class XoWAPITester:
     def __init__(self):

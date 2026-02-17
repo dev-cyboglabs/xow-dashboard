@@ -8,7 +8,7 @@ import os
 import hashlib
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://expo-xow.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://xow-expo-stalls.preview.emergentagent.com').rstrip('/')
 
 class TestDashboardAuth:
     """Dashboard authentication endpoint tests"""

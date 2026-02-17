@@ -2,7 +2,7 @@
   {
     "test": "API Root Endpoint",
     "success": true,
-    "details": "GET https://expo-xow.preview.emergentagent.com/api/",
+    "details": "GET https://xow-expo-stalls.preview.emergentagent.com/api/",
     "timestamp": "2026-02-15T16:26:13.575058",
     "status_code": 200,
     "response": {
@@ -13,7 +13,7 @@
   {
     "test": "Health Check Endpoint",
     "success": true,
-    "details": "GET https://expo-xow.preview.emergentagent.com/api/health",
+    "details": "GET https://xow-expo-stalls.preview.emergentagent.com/api/health",
     "timestamp": "2026-02-15T16:26:13.640308",
     "status_code": 200,
     "response": {
