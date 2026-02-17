@@ -13,8 +13,8 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions } from 'expo-camera';
-import { Audio } from 'expo-av';
+import { CameraView, useCameraPermissions, CameraRecordingOptions } from 'expo-camera';
+import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
 import * as FileSystem from 'expo-file-system';
 import axios from 'axios';
 
@@ -43,16 +43,19 @@ export default function RecorderScreen() {
   const [uploadProgress, setUploadProgress] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
+  const [videoRecordingActive, setVideoRecordingActive] = useState(false);
   const toastAnim = useRef(new Animated.Value(0)).current;
   
   const cameraRef = useRef<CameraView>(null);
-  const audioRecording = useRef<Audio.Recording | null>(null);
   const timerRef = useRef<NodeJS.Timeout | null>(null);
   const frameTimerRef = useRef<NodeJS.Timeout | null>(null);
   const clockRef = useRef<NodeJS.Timeout | null>(null);
   const recordingStartTime = useRef<number>(0);
   const barcodeInputRef = useRef<TextInput>(null);
   const videoUriRef = useRef<string | null>(null);
+  
+  // Use the new expo-audio recorder hook
+  const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   useEffect(() => {
     loadDevice();
@@ -86,13 +89,10 @@ export default function RecorderScreen() {
 
   const checkPermissions = async () => {
     if (!cameraPermission?.granted) await requestCameraPermission();
-    const audioStatus = await Audio.requestPermissionsAsync();
-    if (audioStatus.granted) {
-      await Audio.setAudioModeAsync({
-        allowsRecordingIOS: true,
-        playsInSilentModeIOS: true,
-        staysActiveInBackground: true,
-      });
+    // Request audio permissions using new expo-audio
+    const audioStatus = await AudioModule.requestRecordingPermissionsAsync();
+    if (!audioStatus.granted) {
+      Alert.alert('Permission Required', 'Microphone access is needed for recording.');
     }
   };
 
@@ -132,48 +132,44 @@ export default function RecorderScreen() {
       setBarcodeCount(0);
       setRecordingTime(0);
       recordingStartTime.current = Date.now();
-      videoUriRef.current = null; // Reset video URI
+      videoUriRef.current = null;
       
       // Start timers for UI
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
       frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
 
-      // Start video recording - the promise resolves when recording stops
+      // Start video recording on camera
       if (cameraRef.current && Platform.OS !== 'web') {
         console.log('Starting video recording on', Platform.OS);
+        setVideoRecordingActive(true);
+        
         try {
+          // Start recording - the promise resolves when stopRecording is called
           cameraRef.current.recordAsync({
-            maxDuration: 3600, // 1 hour max (in seconds)
-          }).then((videoResult) => {
-            console.log('Video recording completed:', videoResult);
-            if (videoResult?.uri) {
-              videoUriRef.current = videoResult.uri;
-              console.log('Video URI saved:', videoResult.uri);
+            maxDuration: 3600,
+          }).then((result) => {
+            console.log('Video recording result:', result);
+            if (result?.uri) {
+              videoUriRef.current = result.uri;
+              console.log('Video URI saved:', result.uri);
             }
-          }).catch((videoErr: any) => {
-            console.log('Video recording error:', videoErr?.message || videoErr);
-            // On Android, video recording might fail - just continue with audio
-            Alert.alert(
-              'Video Note',
-              'Video recording may not be available on this device. Audio will still be recorded and transcribed.',
-              [{ text: 'OK' }]
-            );
+            setVideoRecordingActive(false);
+          }).catch((err: any) => {
+            console.log('Video recording error:', err?.message || err);
+            setVideoRecordingActive(false);
           });
         } catch (e: any) {
-          console.log('Video recordAsync failed:', e?.message || e);
+          console.log('recordAsync failed:', e?.message || e);
+          setVideoRecordingActive(false);
         }
       }
 
-      // Start audio recording (primary for transcription)
+      // Start audio recording using new expo-audio
       try {
-        const rec = new Audio.Recording();
-        await rec.prepareToRecordAsync(Audio.RecordingOptionsPresets.HIGH_QUALITY);
-        await rec.startAsync();
-        audioRecording.current = rec;
+        audioRecorder.record();
         console.log('Audio recording started');
       } catch (audioErr: any) {
         console.log('Audio recording error:', audioErr?.message || audioErr);
-        showToast('Microphone access required', true);
       }
 
       showToast('Recording started');
@@ -197,15 +193,14 @@ export default function RecorderScreen() {
       let audioUri: string | null = null;
       let videoUri: string | null = null;
 
-      // Stop video recording first and wait for it to save
-      if (cameraRef.current) {
+      // Stop video recording first
+      if (cameraRef.current && videoRecordingActive) {
         try {
           console.log('Stopping video recording...');
           cameraRef.current.stopRecording();
           
-          // Wait for video to be saved (the recordAsync promise will resolve)
-          // Give it up to 5 seconds to save
-          for (let i = 0; i < 50; i++) {
+          // Wait for video to be saved (up to 10 seconds)
+          for (let i = 0; i < 100; i++) {
             await new Promise(resolve => setTimeout(resolve, 100));
             if (videoUriRef.current) {
               console.log('Video saved at:', videoUriRef.current);
@@ -213,21 +208,19 @@ export default function RecorderScreen() {
             }
           }
           videoUri = videoUriRef.current;
-        } catch (e) {
-          console.log('Stop video error:', e);
+        } catch (e: any) {
+          console.log('Stop video error:', e?.message || e);
         }
       }
+      setVideoRecordingActive(false);
 
       // Stop audio recording
-      if (audioRecording.current) {
-        try {
-          await audioRecording.current.stopAndUnloadAsync();
-          audioUri = audioRecording.current.getURI();
-          console.log('Audio saved at:', audioUri);
-          audioRecording.current = null;
-        } catch (e) {
-          console.log('Stop audio error:', e);
-        }
+      try {
+        await audioRecorder.stop();
+        audioUri = audioRecorder.uri;
+        console.log('Audio saved at:', audioUri);
+      } catch (e: any) {
+        console.log('Stop audio error:', e?.message || e);
       }
 
       // Upload video if available
@@ -239,12 +232,13 @@ export default function RecorderScreen() {
           await uploadVideo(currentRecording.id, videoUri);
           setUploadProgress(50);
           console.log('Video upload complete');
-        } catch (e) {
-          console.log('Video upload failed:', e);
-          showToast('Video upload failed', true);
+        } catch (e: any) {
+          console.log('Video upload failed:', e?.message || e);
+          showToast('Video upload failed - continuing with audio', true);
         }
       } else {
-        console.log('No video to upload');
+        console.log('No video to upload - video recording may not be supported on this device');
+        setUploadProgress(30);
       }
 
       // Upload audio (this triggers automatic transcription)
@@ -255,8 +249,8 @@ export default function RecorderScreen() {
           await uploadAudio(currentRecording.id, audioUri);
           setUploadProgress(90);
           console.log('Audio upload complete');
-        } catch (e) {
-          console.log('Audio upload failed:', e);
+        } catch (e: any) {
+          console.log('Audio upload failed:', e?.message || e);
         }
       }
 
@@ -264,7 +258,8 @@ export default function RecorderScreen() {
       await axios.put(`${API_URL}/api/recordings/${currentRecording.id}/complete`);
       setUploadProgress(100);
       
-      showToast(`Saved! ${barcodeCount} visitors • AI processing started`);
+      const hasVideo = !!videoUri;
+      showToast(`Saved! ${barcodeCount} visitors${hasVideo ? ' • Video + Audio' : ' • Audio only'}`);
       
       // Clean up local files
       if (videoUri) {
@@ -279,8 +274,8 @@ export default function RecorderScreen() {
       setFrameCount(0);
       setBarcodeCount(0);
       videoUriRef.current = null;
-    } catch (e) {
-      console.error('Stop recording error:', e);
+    } catch (e: any) {
+      console.error('Stop recording error:', e?.message || e);
       showToast('Save failed', true);
     } finally {
       setIsUploading(false);
@@ -295,7 +290,7 @@ export default function RecorderScreen() {
       throw new Error('Video file not found');
     }
     
-    console.log('Video file info:', fileInfo);
+    console.log('Video file info:', JSON.stringify(fileInfo));
     
     // Determine file type based on URI
     const isMovFile = uri.toLowerCase().endsWith('.mov');
@@ -318,7 +313,7 @@ export default function RecorderScreen() {
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 300000, // 5 min timeout for large videos
+        timeout: 300000, // 5 min timeout
         onUploadProgress: (progressEvent) => {
           const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
           console.log('Video upload progress:', progress.toFixed(1) + '%');
@@ -331,6 +326,14 @@ export default function RecorderScreen() {
   };
 
   const uploadAudio = async (recordingId: string, uri: string) => {
+    const fileInfo = await FileSystem.getInfoAsync(uri);
+    if (!fileInfo.exists) {
+      console.log('Audio file does not exist:', uri);
+      throw new Error('Audio file not found');
+    }
+    
+    console.log('Audio file info:', JSON.stringify(fileInfo));
+
     const formData = new FormData();
     formData.append('audio', {
       uri,
@@ -343,7 +346,7 @@ export default function RecorderScreen() {
       formData,
       {
         headers: { 'Content-Type': 'multipart/form-data' },
-        timeout: 120000, // 2 min timeout
+        timeout: 120000,
       }
     );
   };
@@ -413,10 +416,11 @@ export default function RecorderScreen() {
             </View>
           </View>
           {isRecording && (
-            <Animated.View style={[styles.recBadge, { opacity: new Animated.Value(1) }]}>
+            <View style={styles.recBadge}>
               <View style={styles.recDot} />
               <Text style={styles.recText}>REC</Text>
-            </Animated.View>
+              {videoRecordingActive && <Text style={styles.videoIndicator}>VIDEO</Text>}
+            </View>
           )}
           <View style={[styles.statusBadge, isOnline ? styles.online : styles.offline]}>
             <View style={[styles.statusDot, isOnline ? styles.onlineDot : styles.offlineDot]} />
@@ -579,6 +583,7 @@ const styles = StyleSheet.create({
   recBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#DC2626', paddingHorizontal: 10, paddingVertical: 5, borderRadius: 4, gap: 5 },
   recDot: { width: 8, height: 8, borderRadius: 4, backgroundColor: '#fff' },
   recText: { color: '#fff', fontSize: 10, fontWeight: '800', letterSpacing: 1 },
+  videoIndicator: { color: '#fff', fontSize: 8, fontWeight: '600', backgroundColor: '#7C3AED', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, marginLeft: 4 },
   statusBadge: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, gap: 4 },
   online: { backgroundColor: 'rgba(16,185,129,0.3)' },
   offline: { backgroundColor: 'rgba(239,68,68,0.3)' },
