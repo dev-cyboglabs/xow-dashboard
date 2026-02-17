@@ -145,6 +145,45 @@ async def extract_audio_from_video(video_data: bytes, video_format: str = "mp4")
         logger.error(f"Audio extraction failed: {e}")
         return None
 
+async def remux_video_for_streaming(video_data: bytes, video_format: str = "mp4") -> bytes:
+    """Re-mux video with faststart flag for web streaming (enables seeking)"""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=f'.{video_format}', delete=False) as input_file:
+            input_file.write(video_data)
+            input_path = input_file.name
+        
+        output_path = input_path.replace(f'.{video_format}', f'_remux.{video_format}')
+        
+        # Re-mux with faststart flag for web streaming compatibility
+        cmd = [
+            'ffmpeg', '-i', input_path,
+            '-c', 'copy',  # Copy streams without re-encoding (fast)
+            '-movflags', '+faststart',  # Enable seeking in web browsers
+            '-y',  # Overwrite output
+            output_path
+        ]
+        
+        result = subprocess.run(cmd, capture_output=True, timeout=300)
+        
+        if result.returncode != 0:
+            logger.warning(f"FFmpeg remux warning: {result.stderr.decode()}")
+            # Return original data if remuxing fails
+            os.unlink(input_path)
+            return video_data
+        
+        with open(output_path, 'rb') as f:
+            remuxed_data = f.read()
+        
+        # Cleanup temp files
+        os.unlink(input_path)
+        os.unlink(output_path)
+        
+        logger.info(f"Successfully remuxed video for streaming ({len(remuxed_data)} bytes)")
+        return remuxed_data
+    except Exception as e:
+        logger.error(f"Video remux failed: {e}")
+        return video_data  # Return original on error
+
 # ==================== HEALTH CHECK ====================
 
 @api_router.get("/health")
