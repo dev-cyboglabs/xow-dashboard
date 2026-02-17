@@ -404,19 +404,6 @@ export default function RecorderScreen() {
         throw new Error('Audio upload failed');
       }
     }
-      const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
-      if (fileInfo.exists) {
-        await FileSystem.uploadAsync(
-          `${API_URL}/api/recordings/${recordingId}/upload-audio`,
-          recording.audioPath,
-          {
-            fieldName: 'audio',
-            httpMethod: 'POST',
-            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-          }
-        );
-      }
-    }
 
     // Upload barcode scans
     for (const scan of recording.barcodeScansList || []) {
