@@ -335,25 +335,39 @@ export default function RecorderScreen() {
   const uploadRecordingToCloud = async (recording: LocalRecording) => {
     if (!device) throw new Error('No device');
     
-    // Create recording entry in backend
-    const res = await axios.post(`${API_URL}/api/recordings`, {
-      device_id: device.device_id,
-      expo_name: 'Expo 2025',
-      booth_name: recording.boothName,
-    });
+    console.log('Starting upload for recording:', recording.localId);
+    console.log('Video path:', recording.videoPath);
+    console.log('Audio path:', recording.audioPath);
     
-    const recordingId = res.data.id;
+    // Create recording entry in backend
+    let recordingId: string;
+    try {
+      const res = await axios.post(`${API_URL}/api/recordings`, {
+        device_id: device.device_id,
+        expo_name: 'Expo 2025',
+        booth_name: recording.boothName,
+      });
+      recordingId = res.data.id;
+      console.log('Created recording in backend:', recordingId);
+    } catch (e: any) {
+      console.error('Failed to create recording:', e?.message || e);
+      throw new Error('Failed to create recording entry');
+    }
 
     // Upload video if available
     if (recording.videoPath) {
       try {
         const fileInfo = await FileSystem.getInfoAsync(recording.videoPath);
+        console.log('Video file info:', fileInfo);
+        
         if (fileInfo.exists) {
           const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
+          const uploadUrl = `${API_URL}/api/recordings/${recordingId}/upload-video`;
           
-          // Use FileSystem.uploadAsync with proper configuration
+          console.log('Uploading video to:', uploadUrl);
+          
           const uploadResult = await FileSystem.uploadAsync(
-            `${API_URL}/api/recordings/${recordingId}/upload-video`,
+            uploadUrl,
             recording.videoPath,
             {
               fieldName: 'video',
@@ -366,11 +380,18 @@ export default function RecorderScreen() {
               },
             }
           );
-          console.log('Video upload result:', uploadResult.status);
+          console.log('Video upload result:', uploadResult.status, uploadResult.body?.substring(0, 200));
+          
+          if (uploadResult.status < 200 || uploadResult.status >= 300) {
+            console.error('Video upload failed:', uploadResult.body);
+            throw new Error(`Video upload failed: ${uploadResult.status}`);
+          }
+        } else {
+          console.log('Video file does not exist:', recording.videoPath);
         }
       } catch (e: any) {
-        console.log('Video upload error:', e?.message || e);
-        throw new Error('Video upload failed');
+        console.error('Video upload error:', e?.message || e);
+        // Don't throw - continue with audio upload
       }
     }
 
@@ -378,9 +399,15 @@ export default function RecorderScreen() {
     if (recording.audioPath) {
       try {
         const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
+        console.log('Audio file info:', fileInfo);
+        
         if (fileInfo.exists) {
+          const uploadUrl = `${API_URL}/api/recordings/${recordingId}/upload-audio`;
+          
+          console.log('Uploading audio to:', uploadUrl);
+          
           const uploadResult = await FileSystem.uploadAsync(
-            `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+            uploadUrl,
             recording.audioPath,
             {
               fieldName: 'audio',
@@ -389,11 +416,18 @@ export default function RecorderScreen() {
               mimeType: 'audio/m4a',
             }
           );
-          console.log('Audio upload result:', uploadResult.status);
+          console.log('Audio upload result:', uploadResult.status, uploadResult.body?.substring(0, 200));
+          
+          if (uploadResult.status < 200 || uploadResult.status >= 300) {
+            console.error('Audio upload failed:', uploadResult.body);
+            throw new Error(`Audio upload failed: ${uploadResult.status}`);
+          }
+        } else {
+          console.log('Audio file does not exist:', recording.audioPath);
         }
       } catch (e: any) {
-        console.log('Audio upload error:', e?.message || e);
-        throw new Error('Audio upload failed');
+        console.error('Audio upload error:', e?.message || e);
+        throw new Error('Audio upload failed: ' + (e?.message || 'Unknown error'));
       }
     }
 
