@@ -590,6 +590,241 @@
             </div>`;
         }
 
+        // Device management
+        let devicesData = { devices: [], count: 0, max_allowed: 10 };
+        let currentUserId = null;
+        
+        async function loadDevices() {
+            // Get user from localStorage
+            const userStr = localStorage.getItem('xow_user');
+            if (userStr) {
+                try {
+                    const user = JSON.parse(userStr);
+                    currentUserId = user.id;
+                    const response = await fetch(`${API}/dashboard/devices/${user.id}`);
+                    devicesData = await response.json();
+                } catch (e) {
+                    console.error('Error loading devices:', e);
+                }
+            }
+        }
+        
+        function renderDevices() {
+            const user = localStorage.getItem('xow_user');
+            if (!user) {
+                return `<div class="fade">
+                    <div class="card rounded-2xl p-12 text-center">
+                        <div class="w-20 h-20 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-10 h-10 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        </div>
+                        <h3 class="text-xl font-semibold text-gray-900 mb-2">Login Required</h3>
+                        <p class="text-gray-500 mb-6">Please log in to manage your devices</p>
+                        <button onclick="window.location.href='/api/home'" class="px-6 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-violet-200 hover:shadow-xl transition-all">
+                            Go to Login
+                        </button>
+                    </div>
+                </div>`;
+            }
+            
+            // Load devices if not loaded
+            if (!devicesData.devices || devicesData.devices.length === 0) {
+                loadDevices().then(() => render());
+            }
+            
+            return `<div class="fade">
+                <!-- Header Section -->
+                <div class="card rounded-2xl p-6 mb-6">
+                    <div class="flex items-center justify-between">
+                        <div>
+                            <h3 class="font-semibold text-gray-900 text-lg">Your Devices</h3>
+                            <p class="text-sm text-gray-500 mt-1">${devicesData.count || 0} of ${devicesData.max_allowed || 10} devices connected</p>
+                        </div>
+                        <button onclick="showAddDeviceModal()" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-violet-200 hover:shadow-xl transition-all" data-testid="add-device-btn">
+                            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/></svg>
+                            Add Device
+                        </button>
+                    </div>
+                </div>
+                
+                <!-- Devices List -->
+                <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    ${(!devicesData.devices || devicesData.devices.length === 0) ? 
+                        `<div class="col-span-full card rounded-2xl p-12 text-center">
+                            <div class="w-20 h-20 rounded-2xl bg-gray-100 flex items-center justify-center mx-auto mb-6">
+                                <svg class="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                            </div>
+                            <h3 class="text-lg font-semibold text-gray-900 mb-2">No Devices Connected</h3>
+                            <p class="text-gray-500 mb-6">Click "Add Device" to connect your mobile app</p>
+                        </div>` :
+                        devicesData.devices.map(d => `
+                            <div class="card rounded-xl p-5" data-testid="device-card">
+                                <div class="flex items-start justify-between mb-4">
+                                    <div class="flex items-center gap-3">
+                                        <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
+                                        </div>
+                                        <div>
+                                            <div class="font-semibold text-gray-900">${d.device_name || 'Mobile Device'}</div>
+                                            <div class="text-sm text-gray-500 font-mono">${d.device_code}</div>
+                                        </div>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium">${d.is_active ? 'Active' : 'Inactive'}</span>
+                                </div>
+                                ${d.associated_at ? `<div class="text-xs text-gray-500 mb-4">Connected ${fmtDate(d.associated_at)}</div>` : ''}
+                                <button onclick="removeDevice('${d.device_code}')" class="w-full flex items-center justify-center gap-2 px-4 py-2 bg-red-50 hover:bg-red-100 text-red-600 rounded-lg text-sm font-medium transition-colors" data-testid="remove-device-btn">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
+                                    Remove Device
+                                </button>
+                            </div>
+                        `).join('')
+                    }
+                </div>
+                
+                <!-- How it works section -->
+                <div class="card rounded-2xl p-6 mt-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">How to Connect a Device</h3>
+                    <div class="grid md:grid-cols-3 gap-6">
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-violet-600 font-bold">1</span>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900">Get Device Code</div>
+                                <p class="text-sm text-gray-500 mt-1">Open the XoW mobile app and note the 6-digit device code displayed</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-violet-600 font-bold">2</span>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900">Add Device Here</div>
+                                <p class="text-sm text-gray-500 mt-1">Click "Add Device" and enter the 6-digit code to get an 8-digit OTP</p>
+                            </div>
+                        </div>
+                        <div class="flex gap-4">
+                            <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-violet-600 font-bold">3</span>
+                            </div>
+                            <div>
+                                <div class="font-medium text-gray-900">Enter OTP</div>
+                                <p class="text-sm text-gray-500 mt-1">Enter the 8-digit OTP in your mobile app to complete the connection</p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>`;
+        }
+        
+        let pendingOtp = null;
+        
+        function showAddDeviceModal() {
+            const modal = document.createElement('div');
+            modal.id = 'add-device-modal';
+            modal.className = 'fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50';
+            modal.innerHTML = `
+                <div class="bg-white rounded-2xl w-full max-w-md mx-4 shadow-2xl overflow-hidden">
+                    <div class="p-6 border-b border-gray-100 bg-gray-50">
+                        <div class="flex items-center justify-between">
+                            <h3 class="font-semibold text-gray-900">Add Device</h3>
+                            <button onclick="closeAddDeviceModal()" class="p-2 hover:bg-gray-200 rounded-lg text-gray-500 transition-colors">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                            </button>
+                        </div>
+                    </div>
+                    <div class="p-6" id="add-device-content">
+                        <p class="text-sm text-gray-600 mb-4">Enter the 6-digit code displayed on your mobile app:</p>
+                        <input type="text" id="device-code-input" maxlength="6" pattern="[0-9]{6}" placeholder="000000" class="w-full px-4 py-3 text-center text-2xl font-mono tracking-[0.5em] border border-gray-200 rounded-xl focus:ring-2 focus:ring-violet-200 focus:border-violet-400 outline-none" data-testid="device-code-input">
+                        <button onclick="addDevice()" class="w-full mt-4 py-3 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-medium shadow-lg shadow-violet-200 hover:shadow-xl transition-all" data-testid="submit-device-code-btn">
+                            Get OTP
+                        </button>
+                    </div>
+                </div>
+            `;
+            document.body.appendChild(modal);
+        }
+        
+        function closeAddDeviceModal() {
+            const modal = document.getElementById('add-device-modal');
+            if (modal) modal.remove();
+            pendingOtp = null;
+        }
+        
+        async function addDevice() {
+            const code = document.getElementById('device-code-input').value;
+            if (code.length !== 6 || !/^\d+$/.test(code)) {
+                alert('Please enter a valid 6-digit code');
+                return;
+            }
+            
+            const userStr = localStorage.getItem('xow_user');
+            if (!userStr) {
+                alert('Please log in first');
+                window.location.href = '/api/home';
+                return;
+            }
+            
+            const user = JSON.parse(userStr);
+            
+            try {
+                const response = await fetch(`${API}/dashboard/devices/add?user_id=${user.id}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ device_code: code })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    pendingOtp = result.otp;
+                    // Show OTP to user
+                    const content = document.getElementById('add-device-content');
+                    content.innerHTML = `
+                        <div class="text-center">
+                            <div class="w-16 h-16 rounded-2xl bg-emerald-100 flex items-center justify-center mx-auto mb-4">
+                                <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+                            </div>
+                            <h4 class="font-semibold text-gray-900 mb-2">Enter this OTP on your mobile app</h4>
+                            <div class="text-4xl font-bold text-violet-600 font-mono tracking-[0.3em] py-4">${result.otp}</div>
+                            <p class="text-sm text-gray-500 mb-4">This code expires in ${result.expires_in_minutes} minutes</p>
+                            <button onclick="closeAddDeviceModal(); loadDevices().then(() => render());" class="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-gray-700 transition-colors">
+                                Done
+                            </button>
+                        </div>
+                    `;
+                } else {
+                    alert(result.detail || 'Failed to add device');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to add device. Please try again.');
+            }
+        }
+        
+        async function removeDevice(deviceCode) {
+            if (!confirm('Remove this device? It will no longer be able to send recordings to this dashboard.')) return;
+            
+            const userStr = localStorage.getItem('xow_user');
+            if (!userStr) return;
+            
+            const user = JSON.parse(userStr);
+            
+            try {
+                const response = await fetch(`${API}/dashboard/devices/${user.id}/${deviceCode}`, { method: 'DELETE' });
+                const result = await response.json();
+                
+                if (result.success) {
+                    await loadDevices();
+                    render();
+                } else {
+                    alert(result.detail || 'Failed to remove device');
+                }
+            } catch (e) {
+                console.error(e);
+                alert('Failed to remove device');
+            }
+        }
+
         // Main playback function with improved timestamp handling
         function playMedia(id, title, time = 0) {
             console.log(`playMedia called: id=${id}, title=${title}, time=${time}`);
