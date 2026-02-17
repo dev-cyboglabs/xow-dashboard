@@ -1125,7 +1125,7 @@ async def get_dashboard_insights():
     
     total_recordings = len(recordings)
     total_visitors = len(visitors)
-    total_duration = sum(r.get('duration', 0) for r in recordings)
+    total_duration = sum(r.get('duration', 0) or 0 for r in recordings)
     
     # Aggregate top topics across all recordings
     all_topics = []
