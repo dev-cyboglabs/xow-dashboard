@@ -988,12 +988,30 @@ async def upload_video(
         
         video_data = await video.read()
         
+        # Detect video format from filename or content type
+        filename = video.filename or "recording.mp4"
+        content_type = video.content_type or "video/mp4"
+        
+        # Determine file extension based on content type
+        if "mp4" in content_type or filename.endswith(".mp4"):
+            ext = "mp4"
+            mime = "video/mp4"
+        elif "webm" in content_type or filename.endswith(".webm"):
+            ext = "webm"
+            mime = "video/webm"
+        elif "mov" in content_type or filename.endswith(".mov"):
+            ext = "mov"
+            mime = "video/quicktime"
+        else:
+            ext = "mp4"  # Default to mp4
+            mime = "video/mp4"
+        
         if total_chunks == 1:
             # Single upload - store directly
             video_id = await fs_bucket.upload_from_stream(
-                f"video_{recording_id}.webm",
+                f"video_{recording_id}.{ext}",
                 io.BytesIO(video_data),
-                metadata={"recording_id": recording_id, "type": "video"}
+                metadata={"recording_id": recording_id, "type": "video", "mime_type": mime}
             )
             
             await db.recordings.update_one(
@@ -1001,6 +1019,7 @@ async def upload_video(
                 {"$set": {
                     "video_file_id": str(video_id),
                     "has_video": True,
+                    "video_mime_type": mime,
                     "status": "uploaded"
                 }}
             )
@@ -1011,7 +1030,9 @@ async def upload_video(
                 "chunk_index": chunk_index,
                 "total_chunks": total_chunks,
                 "data": base64.b64encode(video_data).decode('utf-8'),
-                "uploaded_at": datetime.utcnow()
+                "uploaded_at": datetime.utcnow(),
+                "mime_type": mime,
+                "extension": ext
             })
             
             # Check if all chunks uploaded
@@ -1026,10 +1047,15 @@ async def upload_video(
                     base64.b64decode(c['data']) for c in chunks
                 ])
                 
+                # Get mime type from first chunk
+                first_chunk = chunks[0] if chunks else {}
+                mime = first_chunk.get('mime_type', 'video/mp4')
+                ext = first_chunk.get('extension', 'mp4')
+                
                 video_id = await fs_bucket.upload_from_stream(
-                    f"video_{recording_id}.webm",
+                    f"video_{recording_id}.{ext}",
                     io.BytesIO(combined_data),
-                    metadata={"recording_id": recording_id, "type": "video"}
+                    metadata={"recording_id": recording_id, "type": "video", "mime_type": mime}
                 )
                 
                 await db.recordings.update_one(
@@ -1037,6 +1063,7 @@ async def upload_video(
                     {"$set": {
                         "video_file_id": str(video_id),
                         "has_video": True,
+                        "video_mime_type": mime,
                         "status": "uploaded"
                     }}
                 )
@@ -1044,7 +1071,8 @@ async def upload_video(
                 # Clean up chunks
                 await db.video_chunks.delete_many({"recording_id": recording_id})
         
-        return {"success": True, "message": f"Chunk {chunk_index + 1}/{total_chunks} uploaded"}
+        logger.info(f"Video uploaded for recording {recording_id}: {ext} ({mime})")
+        return {"success": True, "message": f"Chunk {chunk_index + 1}/{total_chunks} uploaded", "format": mime}
     except Exception as e:
         logger.error(f"Video upload error: {e}")
         raise HTTPException(status_code=400, detail=str(e))
