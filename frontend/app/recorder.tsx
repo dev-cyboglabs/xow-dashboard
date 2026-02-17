@@ -334,18 +334,7 @@ export default function RecorderScreen() {
 
       setSaveProgress(100);
 
-      // Clean up temp files
-      if (videoUri && savedVideoPath && videoUri !== savedVideoPath) {
-        try { 
-          await FileSystem.deleteAsync(videoUri, { idempotent: true });
-        } catch {}
-      }
-      if (audioUri && savedAudioPath && audioUri !== savedAudioPath) {
-        try { 
-          await FileSystem.deleteAsync(audioUri, { idempotent: true });
-        } catch {}
-      }
-
+      // Reset state
       setCurrentRecording(null);
       setRecordingTime(0);
       setFrameCount(0);
