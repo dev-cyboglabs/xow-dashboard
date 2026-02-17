@@ -13,9 +13,9 @@ import {
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
-import { CameraView, useCameraPermissions, CameraRecordingOptions } from 'expo-camera';
+import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
-import { File } from 'expo-file-system/next';
+import { File, Paths } from 'expo-file-system/next';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -24,6 +24,25 @@ interface Device {
   id: string;
   device_id: string;
   name: string;
+}
+
+interface LocalRecording {
+  id: string;
+  localId: string;
+  videoPath: string | null;
+  audioPath: string | null;
+  barcodeScansList: BarcodeData[];
+  duration: number;
+  createdAt: string;
+  isUploaded: boolean;
+  boothName: string;
+  deviceId: string;
+}
+
+interface BarcodeData {
+  barcode_data: string;
+  video_timestamp: number;
+  frame_code: number;
 }
 
 export default function RecorderScreen() {
@@ -37,13 +56,15 @@ export default function RecorderScreen() {
   const [frameCount, setFrameCount] = useState(0);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [barcodeCount, setBarcodeCount] = useState(0);
+  const [barcodeScans, setBarcodeScans] = useState<BarcodeData[]>([]);
   const [cameraPermission, requestCameraPermission] = useCameraPermissions();
   const [currentTime, setCurrentTime] = useState(new Date());
-  const [isUploading, setIsUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveProgress, setSaveProgress] = useState(0);
   const [toastVisible, setToastVisible] = useState(false);
   const [toastMessage, setToastMessage] = useState('');
   const [videoRecordingActive, setVideoRecordingActive] = useState(false);
+  const [autoUpload, setAutoUpload] = useState(false);
   const toastAnim = useRef(new Animated.Value(0)).current;
   
   const cameraRef = useRef<CameraView>(null);
@@ -54,11 +75,11 @@ export default function RecorderScreen() {
   const barcodeInputRef = useRef<TextInput>(null);
   const videoUriRef = useRef<string | null>(null);
   
-  // Use the new expo-audio recorder hook
   const audioRecorder = useAudioRecorder(RecordingPresets.HIGH_QUALITY);
 
   useEffect(() => {
     loadDevice();
+    loadSettings();
     checkPermissions();
     checkConnection();
     clockRef.current = setInterval(() => setCurrentTime(new Date()), 1000);
@@ -87,9 +108,20 @@ export default function RecorderScreen() {
     else router.replace('/');
   };
 
+  const loadSettings = async () => {
+    try {
+      const saved = await AsyncStorage.getItem('xow_settings');
+      if (saved) {
+        const settings = JSON.parse(saved);
+        setAutoUpload(settings.autoUpload || false);
+      }
+    } catch (e) {
+      console.log('Load settings error:', e);
+    }
+  };
+
   const checkPermissions = async () => {
     if (!cameraPermission?.granted) await requestCameraPermission();
-    // Request audio permissions using new expo-audio
     const audioStatus = await AudioModule.requestRecordingPermissionsAsync();
     if (!audioStatus.granted) {
       Alert.alert('Permission Required', 'Microphone access is needed for recording.');
@@ -116,23 +148,31 @@ export default function RecorderScreen() {
   const formatDate = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
+  const getRecordingsDir = async () => {
+    const docsDir = Paths.document;
+    const recordingsDir = `${docsDir}/xow_recordings`;
+    const dirFile = new File(recordingsDir);
+    if (!dirFile.exists) {
+      await dirFile.create({ intermediates: true });
+    }
+    return recordingsDir;
+  };
+
   const startRecording = async () => {
     if (!device) return;
     
     try {
-      // Create recording entry in backend first
-      const res = await axios.post(`${API_URL}/api/recordings`, {
-        device_id: device.device_id,
-        expo_name: 'Expo 2025',
-        booth_name: device.name,
-      });
-      setCurrentRecording(res.data);
       setIsRecording(true);
       setFrameCount(0);
       setBarcodeCount(0);
+      setBarcodeScans([]);
       setRecordingTime(0);
       recordingStartTime.current = Date.now();
       videoUriRef.current = null;
+      
+      // Generate a local ID for the recording
+      const localId = `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+      setCurrentRecording({ localId });
       
       // Start timers for UI
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
@@ -144,7 +184,6 @@ export default function RecorderScreen() {
         setVideoRecordingActive(true);
         
         try {
-          // Start recording - the promise resolves when stopRecording is called
           cameraRef.current.recordAsync({
             maxDuration: 3600,
           }).then((result) => {
@@ -164,7 +203,7 @@ export default function RecorderScreen() {
         }
       }
 
-      // Start audio recording using new expo-audio
+      // Start audio recording
       try {
         audioRecorder.record();
         console.log('Audio recording started');
@@ -176,14 +215,15 @@ export default function RecorderScreen() {
     } catch (e: any) {
       console.error('Start recording error:', e?.message || e);
       showToast('Failed to start recording', true);
+      setIsRecording(false);
     }
   };
 
   const stopRecording = async () => {
     if (!currentRecording) return;
     
-    setIsUploading(true);
-    setUploadProgress(0);
+    setIsSaving(true);
+    setSaveProgress(0);
     
     try {
       setIsRecording(false);
@@ -199,7 +239,6 @@ export default function RecorderScreen() {
           console.log('Stopping video recording...');
           cameraRef.current.stopRecording();
           
-          // Wait for video to be saved (up to 10 seconds)
           for (let i = 0; i < 100; i++) {
             await new Promise(resolve => setTimeout(resolve, 100));
             if (videoUriRef.current) {
@@ -223,55 +262,99 @@ export default function RecorderScreen() {
         console.log('Stop audio error:', e?.message || e);
       }
 
-      // Upload video if available
+      setSaveProgress(20);
+
+      // Save files locally
+      const recordingsDir = await getRecordingsDir();
+      const timestamp = Date.now();
+      let savedVideoPath: string | null = null;
+      let savedAudioPath: string | null = null;
+
+      // Copy video to local storage
       if (videoUri) {
-        setUploadProgress(10);
-        showToast('Uploading video...');
         try {
-          console.log('Uploading video from:', videoUri);
-          await uploadVideo(currentRecording.id, videoUri);
-          setUploadProgress(50);
-          console.log('Video upload complete');
+          const videoExt = videoUri.toLowerCase().endsWith('.mov') ? 'mov' : 'mp4';
+          const destVideoPath = `${recordingsDir}/video_${timestamp}.${videoExt}`;
+          const srcFile = new File(videoUri);
+          const destFile = new File(destVideoPath);
+          
+          if (srcFile.exists) {
+            await srcFile.copy(destFile);
+            savedVideoPath = destVideoPath;
+            console.log('Video copied to:', savedVideoPath);
+          }
         } catch (e: any) {
-          console.log('Video upload failed:', e?.message || e);
-          showToast('Video upload failed - continuing with audio', true);
+          console.log('Video copy error:', e?.message || e);
+        }
+      }
+      setSaveProgress(40);
+
+      // Copy audio to local storage
+      if (audioUri) {
+        try {
+          const destAudioPath = `${recordingsDir}/audio_${timestamp}.m4a`;
+          const srcFile = new File(audioUri);
+          const destFile = new File(destAudioPath);
+          
+          if (srcFile.exists) {
+            await srcFile.copy(destFile);
+            savedAudioPath = destAudioPath;
+            console.log('Audio copied to:', savedAudioPath);
+          }
+        } catch (e: any) {
+          console.log('Audio copy error:', e?.message || e);
+        }
+      }
+      setSaveProgress(60);
+
+      // Save recording metadata locally
+      const localRecording: LocalRecording = {
+        id: '', // Will be set after cloud upload
+        localId: currentRecording.localId,
+        videoPath: savedVideoPath,
+        audioPath: savedAudioPath,
+        barcodeScansList: barcodeScans,
+        duration: recordingTime,
+        createdAt: new Date().toISOString(),
+        isUploaded: false,
+        boothName: device?.name || 'Unknown Booth',
+        deviceId: device?.device_id || '',
+      };
+
+      // Get existing local recordings and add new one
+      const existingRecordings = await getLocalRecordings();
+      existingRecordings.unshift(localRecording);
+      await AsyncStorage.setItem('xow_local_recordings', JSON.stringify(existingRecordings));
+      
+      setSaveProgress(80);
+
+      // Auto upload if enabled and online
+      if (autoUpload && isOnline) {
+        showToast('Uploading to cloud...');
+        try {
+          await uploadRecordingToCloud(localRecording);
+          showToast(`Uploaded! ${barcodeCount} visitors${savedVideoPath ? ' • Video + Audio' : ' • Audio only'}`);
+        } catch (e: any) {
+          console.log('Auto upload failed:', e?.message || e);
+          showToast('Saved locally. Upload later from Gallery.', true);
         }
       } else {
-        console.log('No video to upload - video recording may not be supported on this device');
-        setUploadProgress(30);
+        showToast(`Saved locally! ${barcodeCount} visitors${savedVideoPath ? ' • Video + Audio' : ' • Audio only'}`);
       }
 
-      // Upload audio (this triggers automatic transcription)
-      if (audioUri) {
-        setUploadProgress(60);
-        showToast('Uploading audio...');
-        try {
-          await uploadAudio(currentRecording.id, audioUri);
-          setUploadProgress(90);
-          console.log('Audio upload complete');
-        } catch (e: any) {
-          console.log('Audio upload failed:', e?.message || e);
-        }
-      }
+      setSaveProgress(100);
 
-      // Mark recording as complete
-      await axios.put(`${API_URL}/api/recordings/${currentRecording.id}/complete`);
-      setUploadProgress(100);
-      
-      const hasVideo = !!videoUri;
-      showToast(`Saved! ${barcodeCount} visitors${hasVideo ? ' • Video + Audio' : ' • Audio only'}`);
-      
-      // Clean up local files
-      if (videoUri) {
+      // Clean up temp files
+      if (videoUri && savedVideoPath) {
         try { 
-          const videoFile = new File(videoUri);
-          if (videoFile.exists) await videoFile.delete();
+          const tempFile = new File(videoUri);
+          if (tempFile.exists) await tempFile.delete();
         } catch {}
       }
-      if (audioUri) {
+      if (audioUri && savedAudioPath) {
         try { 
-          const audioFile = new File(audioUri);
-          if (audioFile.exists) await audioFile.delete();
+          const tempFile = new File(audioUri);
+          if (tempFile.exists) await tempFile.delete();
         } catch {}
       }
 
@@ -279,123 +362,129 @@ export default function RecorderScreen() {
       setRecordingTime(0);
       setFrameCount(0);
       setBarcodeCount(0);
+      setBarcodeScans([]);
       videoUriRef.current = null;
     } catch (e: any) {
       console.error('Stop recording error:', e?.message || e);
       showToast('Save failed', true);
     } finally {
-      setIsUploading(false);
-      setUploadProgress(0);
+      setIsSaving(false);
+      setSaveProgress(0);
     }
   };
 
-  const uploadVideo = async (recordingId: string, uri: string) => {
+  const getLocalRecordings = async (): Promise<LocalRecording[]> => {
     try {
-      // Use new File API
-      const file = new File(uri);
-      const exists = file.exists;
-      
-      if (!exists) {
-        console.log('Video file does not exist:', uri);
-        throw new Error('Video file not found');
-      }
-      
-      const fileSize = file.size || 0;
-      console.log('Video file size:', fileSize);
-      
-      // Determine file type based on URI
-      const isMovFile = uri.toLowerCase().endsWith('.mov');
-      const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
-      const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
-
-      const formData = new FormData();
-      formData.append('video', {
-        uri,
-        type: mimeType,
-        name: fileName,
-      } as any);
-      formData.append('chunk_index', '0');
-      formData.append('total_chunks', '1');
-
-      console.log('Uploading video:', { recordingId, uri, mimeType, fileName, fileSize });
-      
-      const response = await axios.post(
-        `${API_URL}/api/recordings/${recordingId}/upload-video`,
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 300000, // 5 min timeout
-          onUploadProgress: (progressEvent) => {
-            const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
-            console.log('Video upload progress:', progress.toFixed(1) + '%');
-          }
-        }
-      );
-      
-      console.log('Video upload response:', response.data);
-      return response.data;
-    } catch (e: any) {
-      console.log('Video upload error:', e?.message || e);
-      throw e;
+      const saved = await AsyncStorage.getItem('xow_local_recordings');
+      return saved ? JSON.parse(saved) : [];
+    } catch {
+      return [];
     }
   };
 
-  const uploadAudio = async (recordingId: string, uri: string) => {
-    try {
-      // Use new File API
-      const file = new File(uri);
-      const exists = file.exists;
-      
-      if (!exists) {
-        console.log('Audio file does not exist:', uri);
-        throw new Error('Audio file not found');
-      }
-      
-      const fileSize = file.size || 0;
-      console.log('Audio file size:', fileSize);
+  const uploadRecordingToCloud = async (recording: LocalRecording) => {
+    if (!device) throw new Error('No device');
+    
+    // Create recording entry in backend
+    const res = await axios.post(`${API_URL}/api/recordings`, {
+      device_id: device.device_id,
+      expo_name: 'Expo 2025',
+      booth_name: recording.boothName,
+    });
+    
+    const recordingId = res.data.id;
 
-      const formData = new FormData();
-      formData.append('audio', {
-        uri,
-        type: 'audio/m4a',
-        name: 'recording.m4a',
-      } as any);
-
-      console.log('Uploading audio:', { recordingId, uri, fileSize });
-      
-      const response = await axios.post(
-        `${API_URL}/api/recordings/${recordingId}/upload-audio`,
-        formData,
-        {
-          headers: { 'Content-Type': 'multipart/form-data' },
-          timeout: 120000,
-          onUploadProgress: (progressEvent) => {
-            const progress = progressEvent.loaded / (progressEvent.total || 1) * 100;
-            console.log('Audio upload progress:', progress.toFixed(1) + '%');
-          }
-        }
-      );
-      
-      console.log('Audio upload response:', response.data);
-      return response.data;
-    } catch (e: any) {
-      console.log('Audio upload error:', e?.message || e);
-      throw e;
+    // Upload video if available
+    if (recording.videoPath) {
+      await uploadVideoFile(recordingId, recording.videoPath);
     }
+
+    // Upload audio if available
+    if (recording.audioPath) {
+      await uploadAudioFile(recordingId, recording.audioPath);
+    }
+
+    // Upload barcode scans
+    for (const scan of recording.barcodeScansList) {
+      try {
+        await axios.post(`${API_URL}/api/barcodes`, {
+          recording_id: recordingId,
+          barcode_data: scan.barcode_data,
+          video_timestamp: scan.video_timestamp,
+          frame_code: scan.frame_code,
+        });
+      } catch {}
+    }
+
+    // Mark recording complete
+    await axios.put(`${API_URL}/api/recordings/${recordingId}/complete`);
+
+    // Update local recording with server ID
+    const localRecordings = await getLocalRecordings();
+    const idx = localRecordings.findIndex(r => r.localId === recording.localId);
+    if (idx !== -1) {
+      localRecordings[idx].id = recordingId;
+      localRecordings[idx].isUploaded = true;
+      await AsyncStorage.setItem('xow_local_recordings', JSON.stringify(localRecordings));
+    }
+
+    return recordingId;
+  };
+
+  const uploadVideoFile = async (recordingId: string, videoPath: string) => {
+    const file = new File(videoPath);
+    if (!file.exists) throw new Error('Video file not found');
+
+    const isMovFile = videoPath.toLowerCase().endsWith('.mov');
+    const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
+    const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
+
+    const formData = new FormData();
+    formData.append('video', {
+      uri: videoPath,
+      type: mimeType,
+      name: fileName,
+    } as any);
+    formData.append('chunk_index', '0');
+    formData.append('total_chunks', '1');
+
+    await axios.post(
+      `${API_URL}/api/recordings/${recordingId}/upload-video`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }
+    );
+  };
+
+  const uploadAudioFile = async (recordingId: string, audioPath: string) => {
+    const file = new File(audioPath);
+    if (!file.exists) throw new Error('Audio file not found');
+
+    const formData = new FormData();
+    formData.append('audio', {
+      uri: audioPath,
+      type: 'audio/m4a',
+      name: 'recording.m4a',
+    } as any);
+
+    await axios.post(
+      `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+      formData,
+      { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 }
+    );
   };
 
   const handleBarcode = async () => {
-    if (!barcodeInput.trim() || !currentRecording || !isRecording) return;
+    if (!barcodeInput.trim() || !isRecording) return;
     const bc = barcodeInput.trim();
     const ts = (Date.now() - recordingStartTime.current) / 1000;
-    try {
-      await axios.post(`${API_URL}/api/barcodes`, {
-        recording_id: currentRecording.id,
-        barcode_data: bc,
-        video_timestamp: ts,
-        frame_code: frameCount,
-      });
-    } catch {}
+    
+    // Store barcode locally
+    const newScan: BarcodeData = {
+      barcode_data: bc,
+      video_timestamp: ts,
+      frame_code: frameCount,
+    };
+    setBarcodeScans(prev => [...prev, newScan]);
     setBarcodeCount(p => p + 1);
     setBarcodeInput('');
     showToast(`Visitor: ${bc}`);
@@ -478,7 +567,7 @@ export default function RecorderScreen() {
           )}
         </View>
 
-        {/* XoW Watermark - Bottom Right */}
+        {/* Watermark - Bottom Right */}
         <View style={styles.watermark}>
           <View style={styles.wmIcon}>
             <Ionicons name="videocam" size={12} color="#fff" />
@@ -503,16 +592,19 @@ export default function RecorderScreen() {
           </View>
         )}
 
-        {/* Upload Progress */}
-        {isUploading && (
+        {/* Save Progress */}
+        {isSaving && (
           <View style={styles.uploadOverlay}>
             <View style={styles.uploadBox}>
-              <Ionicons name="cloud-upload" size={32} color="#8B5CF6" />
-              <Text style={styles.uploadTitle}>Uploading & Processing</Text>
+              <Ionicons name="save" size={32} color="#8B5CF6" />
+              <Text style={styles.uploadTitle}>Saving Recording</Text>
               <View style={styles.progressBar}>
-                <View style={[styles.progressFill, { width: `${uploadProgress}%` }]} />
+                <View style={[styles.progressFill, { width: `${saveProgress}%` }]} />
               </View>
-              <Text style={styles.uploadPercent}>{uploadProgress}%</Text>
+              <Text style={styles.uploadPercent}>{saveProgress}%</Text>
+              <Text style={styles.uploadHint}>
+                {autoUpload ? 'Saving & uploading...' : 'Saving locally...'}
+              </Text>
             </View>
           </View>
         )}
@@ -531,6 +623,12 @@ export default function RecorderScreen() {
         <View>
           <Text style={styles.boothName} numberOfLines={1}>{device?.name || 'Booth'}</Text>
           <Text style={styles.boothSub}>Expo Recording</Text>
+          <View style={styles.uploadModeBadge}>
+            <Ionicons name={autoUpload ? 'cloud' : 'save'} size={10} color={autoUpload ? '#10B981' : '#F59E0B'} />
+            <Text style={[styles.uploadModeText, { color: autoUpload ? '#10B981' : '#F59E0B' }]}>
+              {autoUpload ? 'Auto Upload' : 'Local Save'}
+            </Text>
+          </View>
         </View>
 
         {/* Visitor Scan Input */}
@@ -566,11 +664,11 @@ export default function RecorderScreen() {
           <TouchableOpacity
             style={[styles.recBtn, isRecording && styles.recBtnActive]}
             onPress={isRecording ? stopRecording : startRecording}
-            disabled={isUploading}
+            disabled={isSaving}
           >
             <View style={[styles.recBtnInner, isRecording && styles.recBtnInnerActive]}>
-              {isUploading ? (
-                <Ionicons name="cloud-upload" size={20} color="#fff" />
+              {isSaving ? (
+                <Ionicons name="save" size={20} color="#fff" />
               ) : isRecording ? (
                 <View style={styles.stopIcon} />
               ) : (
@@ -579,10 +677,10 @@ export default function RecorderScreen() {
             </View>
           </TouchableOpacity>
           <Text style={styles.recLabel}>
-            {isUploading ? 'UPLOADING' : isRecording ? 'STOP' : 'RECORD'}
+            {isSaving ? 'SAVING' : isRecording ? 'STOP' : 'RECORD'}
           </Text>
           {isRecording && (
-            <Text style={styles.recHint}>Tap to stop & upload</Text>
+            <Text style={styles.recHint}>Tap to stop & save</Text>
           )}
         </View>
 
@@ -591,6 +689,10 @@ export default function RecorderScreen() {
           <TouchableOpacity style={styles.actBtn} onPress={() => router.push('/gallery')}>
             <Ionicons name="folder" size={18} color="#fff" />
             <Text style={styles.actLabel}>Gallery</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.actBtn} onPress={() => router.push('/settings')}>
+            <Ionicons name="settings" size={18} color="#8B5CF6" />
+            <Text style={[styles.actLabel, { color: '#8B5CF6' }]}>Settings</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actBtn} onPress={handleLogout}>
             <Ionicons name="power" size={18} color="#EF4444" />
@@ -646,13 +748,14 @@ const styles = StyleSheet.create({
   durationBox: { position: 'absolute', bottom: 12, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444' },
   durationText: { color: '#EF4444', fontSize: 18, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   
-  // Upload Overlay
+  // Save Overlay
   uploadOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
   uploadBox: { backgroundColor: '#0a0a0a', padding: 30, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#1a1a1a' },
   uploadTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 12, marginBottom: 20 },
   progressBar: { width: 200, height: 6, backgroundColor: '#1a1a1a', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#8B5CF6', borderRadius: 3 },
   uploadPercent: { color: '#8B5CF6', fontSize: 14, fontWeight: '700', marginTop: 8 },
+  uploadHint: { color: '#666', fontSize: 11, marginTop: 8 },
   
   // Toast
   toast: { position: 'absolute', bottom: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.95)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#10B981' },
@@ -662,6 +765,8 @@ const styles = StyleSheet.create({
   panel: { backgroundColor: '#0a0a0a', borderLeftWidth: 1, borderLeftColor: '#1a1a1a', padding: 12, justifyContent: 'space-between' },
   boothName: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   boothSub: { color: '#666', fontSize: 9, textAlign: 'center', marginTop: 2 },
+  uploadModeBadge: { flexDirection: 'row', alignItems: 'center', justifyContent: 'center', gap: 4, marginTop: 6, paddingVertical: 4, paddingHorizontal: 8, backgroundColor: 'rgba(255,255,255,0.05)', borderRadius: 4 },
+  uploadModeText: { fontSize: 9, fontWeight: '600' },
   
   section: { marginTop: 16 },
   secLabel: { color: '#555', fontSize: 8, fontWeight: '700', marginBottom: 6, letterSpacing: 0.5 },
@@ -681,6 +786,6 @@ const styles = StyleSheet.create({
   recHint: { color: '#555', fontSize: 8, marginTop: 2 },
   
   actions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
-  actBtn: { alignItems: 'center', padding: 8 },
-  actLabel: { color: '#888', fontSize: 9, marginTop: 3 },
+  actBtn: { alignItems: 'center', padding: 6 },
+  actLabel: { color: '#888', fontSize: 8, marginTop: 3 },
 });
