@@ -37,6 +37,14 @@
     "plugins": [
       "expo-router",
       [
+        "expo-camera",
+        {
+          "cameraPermission": "XoW needs camera access to record booth activity",
+          "microphonePermission": "XoW needs microphone access to record audio",
+          "recordAudioAndroid": true
+        }
+      ],
+      [
         "expo-splash-screen",
         {
           "image": "./assets/images/splash-icon.png",
