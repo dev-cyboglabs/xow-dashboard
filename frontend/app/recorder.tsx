@@ -354,30 +354,56 @@ export default function RecorderScreen() {
 
     // Upload video if available
     if (recording.videoPath) {
-      const fileInfo = await FileSystem.getInfoAsync(recording.videoPath);
-      if (fileInfo.exists) {
-        const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
-        const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
-        const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
-
-        await FileSystem.uploadAsync(
-          `${API_URL}/api/recordings/${recordingId}/upload-video`,
-          recording.videoPath,
-          {
-            fieldName: 'video',
-            httpMethod: 'POST',
-            uploadType: FileSystem.FileSystemUploadType.MULTIPART,
-            parameters: {
-              chunk_index: '0',
-              total_chunks: '1',
-            },
-          }
-        );
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(recording.videoPath);
+        if (fileInfo.exists) {
+          const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
+          
+          // Use FileSystem.uploadAsync with proper configuration
+          const uploadResult = await FileSystem.uploadAsync(
+            `${API_URL}/api/recordings/${recordingId}/upload-video`,
+            recording.videoPath,
+            {
+              fieldName: 'video',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              mimeType: isMovFile ? 'video/quicktime' : 'video/mp4',
+              parameters: {
+                chunk_index: '0',
+                total_chunks: '1',
+              },
+            }
+          );
+          console.log('Video upload result:', uploadResult.status);
+        }
+      } catch (e: any) {
+        console.log('Video upload error:', e?.message || e);
+        throw new Error('Video upload failed');
       }
     }
 
     // Upload audio if available
     if (recording.audioPath) {
+      try {
+        const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
+        if (fileInfo.exists) {
+          const uploadResult = await FileSystem.uploadAsync(
+            `${API_URL}/api/recordings/${recordingId}/upload-audio`,
+            recording.audioPath,
+            {
+              fieldName: 'audio',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              mimeType: 'audio/m4a',
+            }
+          );
+          console.log('Audio upload result:', uploadResult.status);
+        }
+      } catch (e: any) {
+        console.log('Audio upload error:', e?.message || e);
+        throw new Error('Audio upload failed');
+      }
+    }
       const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
       if (fileInfo.exists) {
         await FileSystem.uploadAsync(
