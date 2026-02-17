@@ -618,7 +618,7 @@ async def upload_video(
     total_chunks: int = Form(1),
     background_tasks: BackgroundTasks = None
 ):
-    """Upload video file for a recording - extracts audio for transcription"""
+    """Upload video file for a recording - remuxes for streaming and extracts audio for transcription"""
     try:
         recording = await db.recordings.find_one({"_id": ObjectId(recording_id)})
         if not recording:
@@ -643,10 +643,14 @@ async def upload_video(
             mime = "video/mp4"
         
         if total_chunks == 1:
+            # Remux video for web streaming (adds faststart flag for seeking)
+            logger.info(f"Remuxing video for streaming support...")
+            remuxed_video = await remux_video_for_streaming(video_data, ext)
+            
             # Single upload - store video
             video_id = await fs_bucket.upload_from_stream(
                 f"video_{recording_id}.{ext}",
-                io.BytesIO(video_data),
+                io.BytesIO(remuxed_video),
                 metadata={"recording_id": recording_id, "type": "video", "mime_type": mime}
             )
             
@@ -660,7 +664,7 @@ async def upload_video(
                 }}
             )
             
-            # Extract audio from video and process
+            # Extract audio from video and process (use original data for audio extraction)
             if background_tasks:
                 background_tasks.add_task(process_video_audio, recording_id, video_data, ext)
             
