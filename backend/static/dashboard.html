@@ -5,74 +5,76 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>XoW Dashboard</title>
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
-        body { background: #000; }
-        .card { background: #0a0a0a; border: 1px solid #1a1a1a; }
-        .purple { color: #8B5CF6; }
-        .bg-purple { background: #8B5CF6; }
+        body { background: #F8FAFC; }
+        .card { background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
+        .purple { color: #7C3AED; }
+        .bg-purple { background: #7C3AED; }
         .fade { animation: fade 0.3s ease; }
         @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .loading { animation: pulse 1.5s infinite; }
-        .conv-card { transition: all 0.2s ease; }
-        .conv-card:hover { border-color: #8B5CF6; transform: translateY(-2px); }
-        .play-overlay { opacity: 0; transition: opacity 0.2s; }
-        .conv-card:hover .play-overlay { opacity: 1; }
+        .nav-btn { transition: all 0.2s ease; }
+        .nav-btn:hover { background: #F1F5F9; }
+        .nav-btn.active { background: #EDE9FE; color: #7C3AED; font-weight: 500; }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
-        ::-webkit-scrollbar-track { background: #0a0a0a; }
-        ::-webkit-scrollbar-thumb { background: #333; border-radius: 3px; }
-        ::-webkit-scrollbar-thumb:hover { background: #444; }
+        ::-webkit-scrollbar-track { background: #F1F5F9; }
+        ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
+        ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
+        .speaker-box { transition: all 0.2s ease; }
+        .speaker-box:hover { border-color: #7C3AED; transform: translateY(-2px); }
     </style>
 </head>
-<body class="min-h-screen text-white">
+<body class="min-h-screen text-gray-900">
     <div class="flex h-screen">
         <!-- Sidebar -->
-        <aside class="w-56 bg-[#0a0a0a] border-r border-[#1a1a1a] flex flex-col shrink-0">
-            <div class="p-5 border-b border-[#1a1a1a]">
+        <aside class="w-60 bg-white border-r border-gray-200 flex flex-col shrink-0">
+            <div class="p-5 border-b border-gray-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-9 h-9 rounded-lg bg-purple flex items-center justify-center">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
                         <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
                         </svg>
                     </div>
                     <div>
-                        <div class="font-bold text-white">XoW</div>
+                        <div class="font-bold text-gray-900 text-lg">XoW</div>
                         <div class="text-xs text-gray-500">Expo Analytics</div>
                     </div>
                 </div>
             </div>
             
-            <nav class="flex-1 p-3">
-                <button onclick="setView('overview')" id="nav-overview" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6z"/></svg>
+            <nav class="flex-1 p-3 space-y-1">
+                <button onclick="setView('overview')" id="nav-overview" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-overview">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     <span class="text-sm">Overview</span>
                 </button>
-                <button onclick="setView('sessions')" id="nav-sessions" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left mb-1">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                <button onclick="setView('sessions')" id="nav-sessions" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-sessions">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                     <span class="text-sm">Sessions</span>
                 </button>
-                <button onclick="setView('visitors')" id="nav-visitors" class="nav-btn w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-left">
-                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197m13.5-9a2.5 2.5 0 11-5 0 2.5 2.5 0 015 0z"/></svg>
+                <button onclick="setView('visitors')" id="nav-visitors" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-visitors">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm">Visitors</span>
                 </button>
             </nav>
 
-            <div class="p-4 border-t border-[#1a1a1a]">
+            <div class="p-4 border-t border-gray-100">
                 <div class="flex items-center gap-2 text-xs text-gray-500">
-                    <div id="status-dot" class="w-2 h-2 rounded-full bg-green-500"></div>
+                    <div id="status-dot" class="w-2 h-2 rounded-full bg-emerald-500"></div>
                     <span id="status-text">System Online</span>
                 </div>
             </div>
         </aside>
 
         <!-- Main -->
-        <main class="flex-1 overflow-auto">
-            <header class="sticky top-0 bg-black/90 backdrop-blur border-b border-[#1a1a1a] px-6 py-4 flex items-center justify-between z-10">
-                <h1 id="page-title" class="text-lg font-semibold">Overview</h1>
+        <main class="flex-1 overflow-auto bg-slate-50">
+            <header class="sticky top-0 bg-white/80 backdrop-blur-lg border-b border-gray-200 px-6 py-4 flex items-center justify-between z-10">
+                <h1 id="page-title" class="text-xl font-semibold text-gray-900">Overview</h1>
                 <div class="flex items-center gap-3">
-                    <select id="lang-select" onchange="setLanguage(this.value)" class="bg-[#111] text-sm px-3 py-1.5 rounded-lg border border-[#222] cursor-pointer">
+                    <select id="lang-select" onchange="setLanguage(this.value)" class="bg-white text-sm px-4 py-2 rounded-lg border border-gray-200 cursor-pointer focus:ring-2 focus:ring-violet-200 focus:border-violet-400 outline-none" data-testid="language-select">
                         <option value="en">English</option>
                         <option value="es">Spanish</option>
                         <option value="fr">French</option>
@@ -82,7 +84,7 @@
                         <option value="ko">Korean</option>
                         <option value="hi">Hindi</option>
                     </select>
-                    <button onclick="refresh()" class="flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[#111] hover:bg-[#1a1a1a] text-sm">
+                    <button onclick="refresh()" class="flex items-center gap-2 px-4 py-2 rounded-lg bg-white border border-gray-200 hover:bg-gray-50 text-sm font-medium text-gray-700 transition-colors" data-testid="refresh-btn">
                         <svg id="refresh-icon" class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                         Refresh
                     </button>
@@ -94,48 +96,55 @@
     </div>
 
     <!-- Media Modal -->
-    <div id="modal" class="fixed inset-0 bg-black/95 hidden items-center justify-center z-50">
-        <div class="bg-[#0a0a0a] rounded-xl w-full max-w-5xl mx-4 border border-[#1a1a1a] overflow-hidden">
-            <div class="flex items-center justify-between p-4 border-b border-[#1a1a1a]">
-                <div>
-                    <span id="modal-title" class="font-medium">Recording</span>
-                    <span id="modal-time" class="text-sm text-gray-500 ml-3"></span>
-                    <span id="modal-type" class="text-xs px-2 py-1 ml-2 rounded bg-[#8B5CF6]/20 text-[#8B5CF6]"></span>
+    <div id="modal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="bg-white rounded-2xl w-full max-w-5xl mx-4 shadow-2xl overflow-hidden">
+            <div class="flex items-center justify-between p-4 border-b border-gray-100 bg-gray-50">
+                <div class="flex items-center gap-3">
+                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                        <svg class="w-5 h-5 text-white" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                    </div>
+                    <div>
+                        <span id="modal-title" class="font-semibold text-gray-900">Recording</span>
+                        <div class="flex items-center gap-2 mt-0.5">
+                            <span id="modal-time" class="text-sm text-gray-500"></span>
+                            <span id="modal-type" class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium"></span>
+                        </div>
+                    </div>
                 </div>
-                <button onclick="closeModal()" class="p-1 hover:bg-[#1a1a1a] rounded">
-                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                <button onclick="closeModal()" class="p-2 hover:bg-gray-100 rounded-lg transition-colors" data-testid="close-modal-btn">
+                    <svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                 </button>
             </div>
             <div class="flex">
                 <div class="flex-1">
-                    <!-- Video Player (hidden when audio only) -->
-                    <video id="video" class="w-full aspect-video bg-black" controls></video>
+                    <!-- Video Player -->
+                    <video id="video" class="w-full aspect-video bg-gray-900" controls data-testid="video-player"></video>
                     <!-- Audio Player (shown when no video) -->
-                    <div id="audio-container" class="hidden p-8 bg-[#111] flex flex-col items-center justify-center" style="min-height: 300px;">
-                        <div class="w-24 h-24 rounded-full bg-gradient-to-br from-[#8B5CF6] to-[#6366F1] flex items-center justify-center mb-6">
+                    <div id="audio-container" class="hidden p-8 bg-gradient-to-br from-violet-50 to-purple-50 flex flex-col items-center justify-center" style="min-height: 300px;">
+                        <div class="w-24 h-24 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mb-6 shadow-xl shadow-violet-200">
                             <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
                         </div>
-                        <p class="text-gray-400 mb-4">Audio Recording</p>
-                        <audio id="audio" class="w-full max-w-md" controls></audio>
+                        <p class="text-gray-600 mb-4 font-medium">Audio Recording</p>
+                        <audio id="audio" class="w-full max-w-md" controls data-testid="audio-player"></audio>
                         <div id="audio-error" class="hidden mt-4 text-center">
-                            <p class="text-amber-400 text-sm mb-3">Audio playback not supported in this browser.</p>
-                            <a id="audio-download" href="#" download class="inline-flex items-center gap-2 px-4 py-2 bg-[#8B5CF6] hover:bg-[#7C3AED] rounded-lg text-white text-sm transition-colors">
+                            <p class="text-amber-600 text-sm mb-3">Audio playback not supported in this browser.</p>
+                            <a id="audio-download" href="#" download class="inline-flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-white text-sm font-medium transition-colors">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"/></svg>
                                 Download Audio
                             </a>
                         </div>
                     </div>
                 </div>
-                <div id="video-sidebar" class="w-72 border-l border-[#1a1a1a] p-4 max-h-[60vh] overflow-y-auto hidden">
-                    <h3 class="text-sm font-medium mb-3 text-gray-400">Jump to Conversation</h3>
+                <div id="video-sidebar" class="w-72 border-l border-gray-100 p-4 max-h-[60vh] overflow-y-auto hidden bg-gray-50">
+                    <h3 class="text-sm font-semibold mb-3 text-gray-700">Jump to Segment</h3>
                     <div id="video-conversations"></div>
                 </div>
             </div>
-            <div id="modal-transcript" class="border-t border-[#1a1a1a] p-4 max-h-40 overflow-y-auto hidden">
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs text-gray-500 uppercase">Transcript</span>
+            <div id="modal-transcript" class="border-t border-gray-100 p-4 max-h-48 overflow-y-auto hidden bg-gray-50">
+                <div class="flex items-center justify-between mb-3">
+                    <span class="text-xs font-semibold text-gray-500 uppercase tracking-wide">Transcript</span>
                     <div class="flex items-center gap-2">
-                        <select id="translate-lang" class="bg-[#111] text-xs px-2 py-1 rounded border border-[#222]">
+                        <select id="translate-lang" class="bg-white text-xs px-3 py-1.5 rounded-lg border border-gray-200">
                             <option value="en">English</option>
                             <option value="es">Spanish</option>
                             <option value="fr">French</option>
@@ -145,10 +154,10 @@
                             <option value="ko">Korean</option>
                             <option value="hi">Hindi</option>
                         </select>
-                        <button onclick="translateTranscript()" id="translate-btn" class="text-xs px-3 py-1 bg-purple hover:bg-[#7C3AED] rounded text-white">Translate</button>
+                        <button onclick="translateTranscript()" id="translate-btn" class="text-xs px-4 py-1.5 bg-violet-600 hover:bg-violet-700 rounded-lg text-white font-medium transition-colors">Translate</button>
                     </div>
                 </div>
-                <p id="transcript-text" class="text-sm text-gray-300 whitespace-pre-wrap"></p>
+                <p id="transcript-text" class="text-sm text-gray-700 whitespace-pre-wrap leading-relaxed"></p>
             </div>
         </div>
     </div>
@@ -173,13 +182,11 @@
                 ]);
                 data = { insights: i, recordings: r, visitors: v };
                 render();
-                document.getElementById('status-dot').classList.remove('bg-red-500');
-                document.getElementById('status-dot').classList.add('bg-green-500');
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-emerald-500';
                 document.getElementById('status-text').textContent = 'System Online';
             } catch(e) { 
                 console.error(e);
-                document.getElementById('status-dot').classList.remove('bg-green-500');
-                document.getElementById('status-dot').classList.add('bg-red-500');
+                document.getElementById('status-dot').className = 'w-2 h-2 rounded-full bg-red-500';
                 document.getElementById('status-text').textContent = 'Connection Error';
             }
             icon.classList.remove('animate-spin');
@@ -187,20 +194,13 @@
 
         function setView(v) {
             view = v;
-            document.querySelectorAll('.nav-btn').forEach(b => {
-                b.classList.remove('bg-[#8B5CF6]/20', 'text-[#8B5CF6]');
-                b.classList.add('text-gray-400', 'hover:bg-[#1a1a1a]');
-            });
-            const btn = document.getElementById(`nav-${v}`);
-            btn.classList.add('bg-[#8B5CF6]/20', 'text-[#8B5CF6]');
-            btn.classList.remove('text-gray-400', 'hover:bg-[#1a1a1a]');
+            document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+            document.getElementById(`nav-${v}`).classList.add('active');
             document.getElementById('page-title').textContent = v.charAt(0).toUpperCase() + v.slice(1);
             render();
         }
 
-        function setLanguage(lang) {
-            currentLang = lang;
-        }
+        function setLanguage(lang) { currentLang = lang; }
 
         function render() {
             const c = document.getElementById('content');
@@ -212,53 +212,73 @@
         function renderOverview() {
             const i = data.insights || {};
             return `<div class="fade">
-                <div class="grid grid-cols-4 gap-4 mb-6">
-                    <div class="card rounded-xl p-5">
-                        <div class="text-3xl font-bold purple">${i.total_recordings || 0}</div>
+                <div class="grid grid-cols-4 gap-5 mb-6">
+                    <div class="card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-gray-900">${i.total_recordings || 0}</div>
                         <div class="text-sm text-gray-500 mt-1">Sessions</div>
                     </div>
-                    <div class="card rounded-xl p-5">
-                        <div class="text-3xl font-bold text-green-400">${i.total_visitors || 0}</div>
+                    <div class="card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-gray-900">${i.total_visitors || 0}</div>
                         <div class="text-sm text-gray-500 mt-1">Visitors Scanned</div>
                     </div>
-                    <div class="card rounded-xl p-5">
-                        <div class="text-3xl font-bold text-blue-400">${(i.total_duration_hours || 0).toFixed(1)}h</div>
+                    <div class="card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-gray-900">${(i.total_duration_hours || 0).toFixed(1)}h</div>
                         <div class="text-sm text-gray-500 mt-1">Recording Time</div>
                     </div>
-                    <div class="card rounded-xl p-5">
-                        <div class="text-3xl font-bold text-amber-400">${countProcessed()}</div>
+                    <div class="card rounded-2xl p-6">
+                        <div class="flex items-center justify-between mb-3">
+                            <div class="w-12 h-12 rounded-xl bg-amber-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-amber-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                            </div>
+                        </div>
+                        <div class="text-3xl font-bold text-gray-900">${countProcessed()}</div>
                         <div class="text-sm text-gray-500 mt-1">AI Processed</div>
                     </div>
                 </div>
                 
                 ${i.top_topics && i.top_topics.length > 0 ? `
-                <div class="card rounded-xl p-5 mb-6">
-                    <h3 class="font-medium mb-3">Top Discussion Topics</h3>
+                <div class="card rounded-2xl p-6 mb-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">Top Discussion Topics</h3>
                     <div class="flex flex-wrap gap-2">
-                        ${i.top_topics.map(t => `<span class="px-3 py-1 bg-[#8B5CF6]/20 text-[#8B5CF6] rounded-full text-sm">${t}</span>`).join('')}
+                        ${i.top_topics.map(t => `<span class="px-4 py-2 bg-violet-50 text-violet-700 rounded-full text-sm font-medium">${t}</span>`).join('')}
                     </div>
                 </div>` : ''}
                 
-                <div class="card rounded-xl p-5">
-                    <h3 class="font-medium mb-4">Recent Sessions</h3>
-                    <div class="space-y-2">
+                <div class="card rounded-2xl p-6">
+                    <h3 class="font-semibold text-gray-900 mb-4">Recent Sessions</h3>
+                    <div class="space-y-3">
                         ${(i.recent_activity || []).map(a => `
-                            <div class="flex items-center justify-between p-3 bg-[#111] rounded-lg hover:bg-[#1a1a1a] cursor-pointer" onclick="setView('sessions')">
-                                <div class="flex items-center gap-3">
-                                    <div class="w-10 h-10 rounded-lg bg-[#8B5CF6]/20 flex items-center justify-center">
-                                        <svg class="w-5 h-5 purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <div class="flex items-center justify-between p-4 bg-slate-50 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors" onclick="setView('sessions')" data-testid="recent-session">
+                                <div class="flex items-center gap-4">
+                                    <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                                        <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                                     </div>
                                     <div>
-                                        <div class="text-sm font-medium">${a.booth_name}</div>
-                                        <div class="text-xs text-gray-500">${fmtDate(a.start_time)} • ${fmtDur(a.duration)}</div>
+                                        <div class="font-medium text-gray-900">${a.booth_name}</div>
+                                        <div class="text-sm text-gray-500">${fmtDate(a.start_time)} &bull; ${fmtDur(a.duration)}</div>
                                     </div>
                                 </div>
                                 <div class="flex items-center gap-3">
-                                    ${a.total_interactions ? `<span class="text-xs text-gray-400">${a.total_interactions} conversations</span>` : ''}
-                                    <span class="text-xs px-2 py-1 rounded ${statusClass(a.status)}">${a.status}</span>
+                                    ${a.total_interactions ? `<span class="text-sm text-gray-500">${a.total_interactions} conversations</span>` : ''}
+                                    <span class="text-xs px-3 py-1.5 rounded-full font-medium ${statusClass(a.status)}">${a.status}</span>
                                 </div>
                             </div>
-                        `).join('') || '<div class="text-gray-500 text-sm text-center py-4">No recent sessions</div>'}
+                        `).join('') || '<div class="text-gray-500 text-sm text-center py-8">No recent sessions</div>'}
                     </div>
                 </div>
             </div>`;
@@ -270,7 +290,7 @@
 
         function renderSessions() {
             return `<div class="fade space-y-6">
-                ${data.recordings.length === 0 ? '<div class="text-gray-500 text-center py-10">No sessions recorded yet</div>' : 
+                ${data.recordings.length === 0 ? '<div class="text-gray-500 text-center py-16">No sessions recorded yet</div>' : 
                 data.recordings.map(r => renderSessionCard(r)).join('')}
             </div>`;
         }
@@ -278,121 +298,123 @@
         function renderSessionCard(r) {
             const speakers = r.speakers || [];
             const hasSpeakers = speakers.length > 0;
-            const conversations = r.conversations || [];
-            const hasConversations = conversations.length > 0;
             
             return `
-            <div class="card rounded-xl overflow-hidden" id="recording-${r.id}">
+            <div class="card rounded-2xl overflow-hidden" id="recording-${r.id}" data-testid="session-card">
                 <!-- Header -->
-                <div class="p-4 border-b border-[#1a1a1a] flex items-center justify-between">
+                <div class="p-5 border-b border-gray-100 flex items-center justify-between">
                     <div class="flex items-center gap-4">
-                        <div class="w-12 h-12 rounded-lg bg-gradient-to-br from-[#8B5CF6] to-[#6366F1] flex items-center justify-center">
-                            <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                        <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                            <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                         </div>
                         <div>
-                            <div class="font-semibold text-lg">${r.booth_name}</div>
-                            <div class="text-sm text-gray-500">${fmtDate(r.start_time)} • Duration: ${fmtDur(r.duration)}${r.total_speakers ? ` • ${r.total_speakers} speakers` : ''}</div>
+                            <div class="font-semibold text-lg text-gray-900">${r.booth_name}</div>
+                            <div class="text-sm text-gray-500">${fmtDate(r.start_time)} &bull; Duration: ${fmtDur(r.duration)}${r.total_speakers ? ` &bull; ${r.total_speakers} speakers` : ''}</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
-                        <span class="text-xs px-3 py-1.5 rounded-full ${statusClass(r.status)}">${r.status}</span>
-                        ${r.status === 'error' ? `<button onclick="reprocessRecording('${r.id}')" class="flex items-center gap-2 px-3 py-2 bg-amber-600 hover:bg-amber-700 rounded-lg text-white text-sm transition-colors">
+                        <span class="text-xs px-3 py-1.5 rounded-full font-medium ${statusClass(r.status)}">${r.status}</span>
+                        ${r.status === 'error' ? `<button onclick="reprocessRecording('${r.id}')" class="flex items-center gap-2 px-4 py-2 bg-amber-500 hover:bg-amber-600 rounded-xl text-white text-sm font-medium transition-colors" data-testid="retry-btn">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                             Retry
                         </button>` : ''}
-                        ${hasSpeakers ? `<button onclick="showDetailedInsights('${r.id}')" class="flex items-center gap-2 px-4 py-2 bg-gradient-to-r from-[#8B5CF6] to-[#6366F1] hover:opacity-90 rounded-lg text-white text-sm transition-all font-medium">
+                        ${hasSpeakers ? `<button onclick="showDetailedInsights('${r.id}')" class="flex items-center gap-2 px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-700 hover:to-purple-700 rounded-xl text-white text-sm font-medium transition-all shadow-lg shadow-violet-200" data-testid="detailed-insights-btn">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
                             Detailed Insights
                         </button>` : ''}
-                        ${r.has_audio ? `<button onclick="playVideo('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2 bg-[#111] hover:bg-[#1a1a1a] border border-[#333] rounded-lg text-white text-sm transition-colors">
-                            <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        ${r.has_audio ? `<button onclick="playMedia('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2.5 bg-white border border-gray-200 hover:bg-gray-50 rounded-xl text-gray-700 text-sm font-medium transition-colors" data-testid="play-btn">
+                            <svg class="w-4 h-4 text-violet-600" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             Play
                         </button>` : ''}
-                        <button onclick="deleteRecording('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-3 py-2 bg-red-600/20 hover:bg-red-600 rounded-lg text-red-400 hover:text-white text-sm transition-colors">
+                        <button onclick="deleteRecording('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-3 py-2.5 bg-red-50 hover:bg-red-100 rounded-xl text-red-600 text-sm font-medium transition-colors" data-testid="delete-btn">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/></svg>
                         </button>
                     </div>
                 </div>
                 
-                <!-- Overall AI Summary (Always visible) -->
+                <!-- Overall AI Summary -->
                 ${r.overall_summary || r.summary ? `
-                <div class="p-4 bg-gradient-to-r from-[#8B5CF6]/10 to-transparent border-b border-[#1a1a1a]">
-                    <div class="flex items-center gap-2 mb-2">
-                        <svg class="w-4 h-4 purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
-                        <span class="text-sm font-medium purple">Overall Summary</span>
-                        ${r.host_identified ? `<span class="text-xs px-2 py-0.5 bg-green-500/20 text-green-400 rounded-full ml-2">Host Identified</span>` : ''}
+                <div class="p-5 bg-gradient-to-r from-violet-50 to-purple-50 border-b border-gray-100">
+                    <div class="flex items-center gap-2 mb-3">
+                        <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        </div>
+                        <span class="text-sm font-semibold text-violet-700">AI Summary</span>
+                        ${r.host_identified ? `<span class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium ml-2">Host Identified</span>` : ''}
                     </div>
-                    <p class="text-gray-300">${r.overall_summary || r.summary}</p>
+                    <p class="text-gray-700 leading-relaxed">${r.overall_summary || r.summary}</p>
                     ${r.main_topics && r.main_topics.length > 0 ? `
-                    <div class="flex flex-wrap gap-2 mt-3">
-                        ${r.main_topics.slice(0, 6).map(t => `<span class="text-xs px-2 py-1 bg-[#111] rounded-full text-gray-400">${t}</span>`).join('')}
+                    <div class="flex flex-wrap gap-2 mt-4">
+                        ${r.main_topics.slice(0, 6).map(t => `<span class="text-xs px-3 py-1.5 bg-white rounded-full text-gray-600 font-medium border border-gray-200">${t}</span>`).join('')}
                     </div>` : ''}
                     ${r.follow_up_actions && r.follow_up_actions.length > 0 ? `
-                    <div class="mt-3 pt-3 border-t border-[#1a1a1a]">
-                        <div class="text-xs text-amber-400 font-medium mb-1">Follow-up Actions:</div>
-                        <ul class="text-xs text-gray-400 list-disc list-inside">
-                            ${r.follow_up_actions.map(a => `<li>${a}</li>`).join('')}
+                    <div class="mt-4 pt-4 border-t border-violet-100">
+                        <div class="text-xs text-amber-600 font-semibold mb-2">Follow-up Actions</div>
+                        <ul class="text-sm text-gray-600 space-y-1">
+                            ${r.follow_up_actions.map(a => `<li class="flex items-start gap-2"><span class="text-amber-500 mt-1">&#8226;</span>${a}</li>`).join('')}
                         </ul>
                     </div>` : ''}
                 </div>` : r.status === 'processing' || r.status === 'uploaded' ? `
-                <div class="p-4 bg-[#111] border-b border-[#1a1a1a]">
-                    <div class="flex items-center gap-3 text-amber-400">
+                <div class="p-5 bg-blue-50 border-b border-gray-100">
+                    <div class="flex items-center gap-3 text-blue-700">
                         <div class="loading">
                             <svg class="w-5 h-5 animate-spin" fill="none" viewBox="0 0 24 24"><circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle><path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path></svg>
                         </div>
-                        <span class="text-sm">Processing audio with AI speaker diarization...</span>
+                        <span class="text-sm font-medium">Processing audio with AI speaker diarization...</span>
                     </div>
                 </div>` : (!r.transcript && r.status !== 'error') ? `
-                <div class="p-4 bg-[#111] border-b border-[#1a1a1a]">
+                <div class="p-5 bg-amber-50 border-b border-gray-100">
                     <div class="flex items-center justify-between">
-                        <div class="text-sm text-gray-400">
-                            <span class="text-amber-400">Note:</span> Audio transcription requires OpenAI API key. You can add a manual transcript for AI analysis.
+                        <div class="text-sm text-gray-600">
+                            <span class="text-amber-600 font-medium">Note:</span> Audio transcription requires OpenAI API key. You can add a manual transcript for AI analysis.
                         </div>
-                        <button onclick="showTranscriptInput('${r.id}')" class="flex items-center gap-2 px-3 py-1.5 bg-purple/20 hover:bg-purple rounded text-sm text-purple hover:text-white transition-colors">
+                        <button onclick="showTranscriptInput('${r.id}')" class="flex items-center gap-2 px-4 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-sm text-white font-medium transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"/></svg>
                             Add Transcript
                         </button>
                     </div>
                     <div id="transcript-input-${r.id}" class="hidden mt-4">
-                        <textarea id="transcript-text-${r.id}" class="w-full h-32 bg-[#0a0a0a] border border-[#1a1a1a] rounded-lg p-3 text-sm text-white resize-none" placeholder="Paste or type the transcript here..."></textarea>
-                        <div class="flex justify-end gap-2 mt-2">
-                            <button onclick="hideTranscriptInput('${r.id}')" class="px-3 py-1.5 text-sm text-gray-400 hover:text-white">Cancel</button>
-                            <button onclick="submitManualTranscript('${r.id}')" class="px-4 py-1.5 bg-purple hover:bg-[#7C3AED] rounded text-sm text-white">Analyze with AI</button>
+                        <textarea id="transcript-text-${r.id}" class="w-full h-32 bg-white border border-gray-200 rounded-xl p-4 text-sm text-gray-900 resize-none focus:ring-2 focus:ring-violet-200 focus:border-violet-400 outline-none" placeholder="Paste or type the transcript here..."></textarea>
+                        <div class="flex justify-end gap-2 mt-3">
+                            <button onclick="hideTranscriptInput('${r.id}')" class="px-4 py-2 text-sm text-gray-500 hover:text-gray-700 font-medium">Cancel</button>
+                            <button onclick="submitManualTranscript('${r.id}')" class="px-5 py-2 bg-violet-600 hover:bg-violet-700 rounded-lg text-sm text-white font-medium transition-colors">Analyze with AI</button>
                         </div>
                     </div>
                 </div>` : ''}
                 
-                <!-- Speaker Boxes (PLAUD Style) - Collapsed by default -->
+                <!-- Speaker Boxes (Collapsed by default) -->
                 <div id="speakers-${r.id}" class="hidden">
                     ${hasSpeakers ? `
-                    <div class="p-4 border-t border-[#1a1a1a]">
-                        <div class="flex items-center justify-between mb-4">
-                            <h4 class="text-sm font-semibold text-white flex items-center gap-2">
-                                <svg class="w-4 h-4 purple" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                    <div class="p-5 border-t border-gray-100 bg-slate-50">
+                        <div class="flex items-center justify-between mb-5">
+                            <h4 class="text-sm font-semibold text-gray-900 flex items-center gap-2">
+                                <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
+                                    <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
+                                </div>
                                 Speakers (${speakers.length})
                             </h4>
-                            <button onclick="hideDetailedInsights('${r.id}')" class="text-xs text-gray-400 hover:text-white">
+                            <button onclick="hideDetailedInsights('${r.id}')" class="p-2 hover:bg-gray-200 rounded-lg text-gray-400 hover:text-gray-600 transition-colors">
                                 <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
                             </button>
                         </div>
                         <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
-                            ${speakers.map((speaker, idx) => renderSpeakerBox(speaker, idx, r.id, r.booth_name)).join('')}
+                            ${speakers.map((speaker, idx) => renderSpeakerBox(speaker, idx, r.id, r.booth_name, r.duration || 0)).join('')}
                         </div>
                     </div>` : ''}
                 </div>
                 
-                <!-- Barcode Scans (if any) -->
+                <!-- Barcode Scans -->
                 ${r.barcode_scans && r.barcode_scans.length > 0 ? `
-                <div class="p-4 border-t border-[#1a1a1a]">
-                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-2">
+                <div class="p-5 border-t border-gray-100">
+                    <div class="text-xs text-gray-500 mb-3 flex items-center gap-2 font-medium">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
                         Visitor Scans (${r.barcode_scans.length})
                     </div>
                     <div class="flex flex-wrap gap-2">
                         ${r.barcode_scans.map(s => `
-                            <div class="flex items-center gap-2 px-3 py-2 bg-[#111] rounded-lg cursor-pointer hover:bg-[#1a1a1a] ${r.has_audio ? '' : 'pointer-events-none'}" onclick="playVideo('${r.id}','${r.booth_name}',${s.video_timestamp||0})">
-                                <svg class="w-4 h-4 text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
-                                <span class="text-sm font-medium">${s.barcode_data}</span>
+                            <div class="flex items-center gap-2 px-4 py-2 bg-emerald-50 border border-emerald-200 rounded-xl cursor-pointer hover:bg-emerald-100 transition-colors ${r.has_audio ? '' : 'pointer-events-none opacity-60'}" onclick="playMedia('${r.id}','${r.booth_name}',${s.video_timestamp||0})" data-testid="barcode-scan">
+                                <svg class="w-4 h-4 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                                <span class="text-sm font-medium text-gray-700">${s.barcode_data}</span>
                                 ${s.video_timestamp ? `<span class="text-xs text-gray-500">@ ${fmtDur(s.video_timestamp)}</span>` : ''}
                             </div>
                         `).join('')}
@@ -401,100 +423,104 @@
             </div>`;
         }
 
-        function renderSpeakerBox(speaker, idx, recordingId, boothName) {
+        function renderSpeakerBox(speaker, idx, recordingId, boothName, duration) {
             const isHost = speaker.is_host;
             const labelSource = speaker.label_source;
             const segments = speaker.dialogue_segments || [];
             const firstSegment = segments[0];
             
-            // Determine label badge color based on source
             let labelBadge = '';
             if (labelSource === 'name_mentioned') {
-                labelBadge = `<span class="text-xs px-1.5 py-0.5 bg-blue-500/20 text-blue-400 rounded">Name</span>`;
+                labelBadge = `<span class="text-xs px-2 py-0.5 bg-blue-100 text-blue-700 rounded-full font-medium">Name</span>`;
             } else if (labelSource === 'barcode_scan') {
-                labelBadge = `<span class="text-xs px-1.5 py-0.5 bg-green-500/20 text-green-400 rounded">Barcode</span>`;
+                labelBadge = `<span class="text-xs px-2 py-0.5 bg-emerald-100 text-emerald-700 rounded-full font-medium">Barcode</span>`;
             }
             
+            // Calculate actual start time for playback
+            const startTime = firstSegment ? (firstSegment.start_time || ((firstSegment.start_percent || 0) / 100 * duration)) : 0;
+            
             return `
-            <div class="speaker-box bg-[#111] rounded-xl overflow-hidden border border-[#1a1a1a] hover:border-[#333] transition-all" data-testid="speaker-box-${idx}">
+            <div class="speaker-box bg-white rounded-xl overflow-hidden border border-gray-200" data-testid="speaker-box-${idx}">
                 <!-- Speaker Header -->
-                <div class="p-4 border-b border-[#1a1a1a] ${isHost ? 'bg-gradient-to-r from-[#8B5CF6]/20 to-transparent' : ''}">
+                <div class="p-4 border-b border-gray-100 ${isHost ? 'bg-gradient-to-r from-violet-50 to-purple-50' : 'bg-gray-50'}">
                     <div class="flex items-start justify-between">
                         <div class="flex items-center gap-3">
-                            <div class="w-10 h-10 rounded-full ${isHost ? 'bg-gradient-to-br from-[#8B5CF6] to-[#6366F1]' : 'bg-[#1a1a1a]'} flex items-center justify-center flex-shrink-0">
+                            <div class="w-11 h-11 rounded-full ${isHost ? 'bg-gradient-to-br from-violet-500 to-purple-600 shadow-lg shadow-violet-200' : 'bg-gray-200'} flex items-center justify-center flex-shrink-0">
                                 ${isHost ? 
                                     `<svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>` : 
-                                    `<svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`
+                                    `<svg class="w-5 h-5 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>`
                                 }
                             </div>
                             <div>
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <span class="font-semibold text-white">${speaker.label || `Speaker ${idx + 1}`}</span>
-                                    ${isHost ? `<span class="text-xs px-2 py-0.5 bg-[#8B5CF6]/30 text-[#8B5CF6] rounded-full font-medium">HOST</span>` : ''}
+                                    <span class="font-semibold text-gray-900">${speaker.label || `Speaker ${idx + 1}`}</span>
+                                    ${isHost ? `<span class="text-xs px-2 py-0.5 bg-violet-600 text-white rounded-full font-medium">HOST</span>` : ''}
                                     ${labelBadge}
                                 </div>
-                                ${speaker.company ? `<div class="text-xs text-gray-400 mt-0.5">${speaker.company}${speaker.role ? ` • ${speaker.role}` : ''}</div>` : ''}
+                                ${speaker.company ? `<div class="text-xs text-gray-500 mt-0.5">${speaker.company}${speaker.role ? ` &bull; ${speaker.role}` : ''}</div>` : ''}
                             </div>
                         </div>
-                        <span class="text-xs px-2 py-1 rounded ${sentimentClass(speaker.sentiment)}">${speaker.sentiment || 'neutral'}</span>
+                        <span class="text-xs px-2 py-1 rounded-full font-medium ${sentimentClass(speaker.sentiment)}">${speaker.sentiment || 'neutral'}</span>
                     </div>
                 </div>
                 
                 <!-- Speaker Content -->
-                <div class="p-4 space-y-3">
+                <div class="p-4 space-y-4">
                     <!-- Topics -->
                     ${speaker.topics_discussed && speaker.topics_discussed.length > 0 ? `
                     <div>
-                        <div class="text-xs text-gray-500 mb-1.5">Topics Discussed</div>
+                        <div class="text-xs text-gray-500 font-medium mb-2">Topics Discussed</div>
                         <div class="flex flex-wrap gap-1.5">
-                            ${speaker.topics_discussed.slice(0, 4).map(t => `<span class="text-xs px-2 py-1 bg-[#1a1a1a] rounded text-gray-300">${t}</span>`).join('')}
+                            ${speaker.topics_discussed.slice(0, 4).map(t => `<span class="text-xs px-2.5 py-1 bg-gray-100 rounded-full text-gray-700">${t}</span>`).join('')}
                         </div>
                     </div>` : ''}
                     
                     <!-- Key Points -->
                     ${speaker.key_points && speaker.key_points.length > 0 ? `
                     <div>
-                        <div class="text-xs text-gray-500 mb-1.5">Key Points</div>
-                        <ul class="text-sm text-gray-300 space-y-1">
-                            ${speaker.key_points.slice(0, 3).map(p => `<li class="flex items-start gap-2"><span class="text-[#8B5CF6] mt-1">•</span>${p}</li>`).join('')}
+                        <div class="text-xs text-gray-500 font-medium mb-2">Key Points</div>
+                        <ul class="text-sm text-gray-700 space-y-1.5">
+                            ${speaker.key_points.slice(0, 3).map(p => `<li class="flex items-start gap-2"><span class="text-violet-500 mt-1">&#8226;</span>${p}</li>`).join('')}
                         </ul>
                     </div>` : ''}
                     
                     <!-- Questions Asked -->
                     ${speaker.questions_asked && speaker.questions_asked.length > 0 ? `
                     <div>
-                        <div class="text-xs text-gray-500 mb-1.5">Questions Asked</div>
-                        <ul class="text-sm text-amber-300/80 space-y-1">
-                            ${speaker.questions_asked.slice(0, 2).map(q => `<li class="flex items-start gap-2"><span class="text-amber-400">?</span>${q}</li>`).join('')}
+                        <div class="text-xs text-gray-500 font-medium mb-2">Questions Asked</div>
+                        <ul class="text-sm text-amber-700 space-y-1.5">
+                            ${speaker.questions_asked.slice(0, 2).map(q => `<li class="flex items-start gap-2"><span class="text-amber-500">?</span>${q}</li>`).join('')}
                         </ul>
                     </div>` : ''}
                     
                     <!-- Play Segment Button -->
                     ${firstSegment ? `
-                    <button onclick="playVideo('${recordingId}','${boothName}',${firstSegment.start_time || 0})" class="w-full flex items-center justify-center gap-2 mt-3 px-4 py-2 bg-[#1a1a1a] hover:bg-[#222] rounded-lg text-sm text-white transition-colors group">
-                        <svg class="w-4 h-4 text-purple group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
-                        <span>Play from ${firstSegment.timestamp_label || fmtDur(firstSegment.start_time)}</span>
+                    <button onclick="playMedia('${recordingId}','${boothName}',${startTime})" class="w-full flex items-center justify-center gap-2 px-4 py-2.5 bg-violet-50 hover:bg-violet-100 border border-violet-200 rounded-xl text-sm text-violet-700 font-medium transition-colors group" data-testid="play-segment-btn">
+                        <svg class="w-4 h-4 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                        <span>Play from ${firstSegment.timestamp_label || fmtDur(startTime)}</span>
                     </button>` : ''}
                 </div>
                 
                 <!-- Expandable Dialogue -->
-                <div id="dialogue-${recordingId}-${idx}" class="hidden border-t border-[#1a1a1a]">
-                    <div class="p-4 bg-[#0a0a0a]">
-                        <div class="text-xs text-gray-500 mb-2">What they said:</div>
+                <div id="dialogue-${recordingId}-${idx}" class="hidden border-t border-gray-100">
+                    <div class="p-4 bg-slate-50">
+                        <div class="text-xs text-gray-500 font-medium mb-3">What they said:</div>
                         <div class="space-y-2 max-h-40 overflow-y-auto">
-                            ${segments.map(seg => `
-                                <div class="text-sm text-gray-300 p-2 bg-[#111] rounded cursor-pointer hover:bg-[#1a1a1a]" onclick="playVideo('${recordingId}','${boothName}',${seg.start_time || 0})">
-                                    <span class="text-xs font-mono purple mr-2">${seg.timestamp_label || fmtDur(seg.start_time)}</span>
+                            ${segments.map(seg => {
+                                const segTime = seg.start_time || ((seg.start_percent || 0) / 100 * duration);
+                                return `
+                                <div class="text-sm text-gray-700 p-3 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 transition-colors" onclick="playMedia('${recordingId}','${boothName}',${segTime})" data-testid="dialogue-segment">
+                                    <span class="text-xs font-mono text-violet-600 mr-2">${seg.timestamp_label || fmtDur(segTime)}</span>
                                     "${seg.content || ''}"
-                                </div>
-                            `).join('')}
+                                </div>`;
+                            }).join('')}
                         </div>
                     </div>
                 </div>
                 
                 <!-- Toggle Dialogue Button -->
                 ${segments.length > 0 ? `
-                <button onclick="toggleDialogue('${recordingId}', ${idx})" class="w-full p-2 text-xs text-gray-500 hover:text-white hover:bg-[#1a1a1a] transition-colors flex items-center justify-center gap-1" data-testid="toggle-dialogue-btn">
+                <button onclick="toggleDialogue('${recordingId}', ${idx})" class="w-full p-3 text-xs text-gray-500 hover:text-violet-600 hover:bg-violet-50 transition-colors flex items-center justify-center gap-1 border-t border-gray-100 font-medium" data-testid="toggle-dialogue-btn">
                     <span id="toggle-text-${recordingId}-${idx}">Show full dialogue</span>
                     <svg id="toggle-icon-${recordingId}-${idx}" class="w-3 h-3 transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"/></svg>
                 </button>` : ''}
@@ -511,9 +537,7 @@
 
         function hideDetailedInsights(recordingId) {
             const speakersDiv = document.getElementById(`speakers-${recordingId}`);
-            if (speakersDiv) {
-                speakersDiv.classList.add('hidden');
-            }
+            if (speakersDiv) speakersDiv.classList.add('hidden');
         }
 
         function toggleDialogue(recordingId, speakerIdx) {
@@ -524,39 +548,34 @@
             if (dialogueDiv) {
                 const isHidden = dialogueDiv.classList.contains('hidden');
                 dialogueDiv.classList.toggle('hidden');
-                
-                if (toggleText) {
-                    toggleText.textContent = isHidden ? 'Hide dialogue' : 'Show full dialogue';
-                }
-                if (toggleIcon) {
-                    toggleIcon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-                }
+                if (toggleText) toggleText.textContent = isHidden ? 'Hide dialogue' : 'Show full dialogue';
+                if (toggleIcon) toggleIcon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
             }
         }
 
         function renderVisitors() {
             return `<div class="fade">
                 <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-                    ${data.visitors.length === 0 ? '<div class="col-span-full text-gray-500 text-center py-10">No visitors scanned yet</div>' : 
+                    ${data.visitors.length === 0 ? '<div class="col-span-full text-gray-500 text-center py-16">No visitors scanned yet</div>' : 
                     data.visitors.map(v => {
                         const rec = data.recordings.find(r => r.id === v.recording_id);
                         return `
-                        <div class="card rounded-xl p-4 ${v.video_timestamp && rec?.has_audio ? 'cursor-pointer hover:border-[#8B5CF6]/50' : ''}" onclick="${v.video_timestamp && rec?.has_audio ? `playVideo('${v.recording_id}','${rec?.booth_name||''}',${v.video_timestamp})` : ''}">
-                            <div class="flex items-center gap-3 mb-3">
-                                <div class="w-12 h-12 rounded-full bg-gradient-to-br from-[#8B5CF6] to-[#6366F1] flex items-center justify-center">
-                                    <svg class="w-6 h-6 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
+                        <div class="card rounded-xl p-5 ${v.video_timestamp && rec?.has_audio ? 'cursor-pointer hover:shadow-lg' : ''} transition-all" onclick="${v.video_timestamp && rec?.has_audio ? `playMedia('${v.recording_id}','${rec?.booth_name||''}',${v.video_timestamp})` : ''}" data-testid="visitor-card">
+                            <div class="flex items-center gap-4 mb-4">
+                                <div class="w-14 h-14 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/></svg>
                                 </div>
                                 <div class="flex-1 min-w-0">
-                                    <div class="font-semibold truncate">${v.barcode_data}</div>
-                                    <div class="text-xs text-gray-500">${fmtDate(v.scan_time)}</div>
+                                    <div class="font-semibold text-gray-900 truncate">${v.barcode_data}</div>
+                                    <div class="text-sm text-gray-500">${fmtDate(v.scan_time)}</div>
                                 </div>
                             </div>
                             ${rec ? `
-                            <div class="text-sm text-gray-400 mb-2">
-                                <span class="text-gray-600">Session:</span> ${rec.booth_name}
+                            <div class="text-sm text-gray-600 mb-3">
+                                <span class="text-gray-400">Session:</span> ${rec.booth_name}
                             </div>` : ''}
                             ${v.video_timestamp ? `
-                            <div class="flex items-center gap-2 text-sm purple">
+                            <div class="flex items-center gap-2 text-sm text-violet-600 font-medium">
                                 <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                 <span>Watch @ ${fmtDur(v.video_timestamp)}</span>
                             </div>` : ''}
@@ -566,7 +585,9 @@
             </div>`;
         }
 
-        function playVideo(id, title, time=0) {
+        // Main playback function with improved timestamp handling
+        function playMedia(id, title, time = 0) {
+            console.log(`playMedia called: id=${id}, title=${title}, time=${time}`);
             currentRecordingId = id;
             document.getElementById('modal-title').textContent = title;
             document.getElementById('modal-time').textContent = time > 0 ? `Starting at ${fmtDur(time)}` : '';
@@ -576,27 +597,36 @@
             const audioEl = document.getElementById('audio');
             const modalType = document.getElementById('modal-type');
             
-            // Find recording and setup sidebar
             const rec = data.recordings.find(r => r.id === id);
             const sidebar = document.getElementById('video-sidebar');
             const convContainer = document.getElementById('video-conversations');
             const transcriptSection = document.getElementById('modal-transcript');
             const transcriptText = document.getElementById('transcript-text');
             
-            // Determine if video or audio only
-            if (rec && rec.has_video) {
-                // Show video player
+            if (!rec) {
+                alert('Recording not found');
+                return;
+            }
+            
+            // Determine media type and set source
+            if (rec.has_video) {
                 videoEl.classList.remove('hidden');
                 audioContainer.classList.add('hidden');
                 videoEl.src = `${API}/recordings/${id}/video`;
                 modalType.textContent = 'Video';
                 
-                videoEl.onloadeddata = () => {
-                    videoEl.currentTime = time;
-                    videoEl.play().catch(e => console.log('Autoplay prevented'));
+                // Wait for metadata to load before seeking
+                videoEl.onloadedmetadata = () => {
+                    console.log(`Video metadata loaded. Duration: ${videoEl.duration}, seeking to: ${time}`);
+                    if (time > 0 && time < videoEl.duration) {
+                        videoEl.currentTime = time;
+                    }
                 };
-            } else if (rec && rec.has_audio) {
-                // Show audio player
+                
+                videoEl.oncanplay = () => {
+                    videoEl.play().catch(e => console.log('Autoplay prevented:', e));
+                };
+            } else if (rec.has_audio) {
                 videoEl.classList.add('hidden');
                 audioContainer.classList.remove('hidden');
                 document.getElementById('audio-error').classList.add('hidden');
@@ -604,17 +634,19 @@
                 const audioUrl = `${API}/recordings/${id}/audio`;
                 audioEl.src = audioUrl;
                 modalType.textContent = 'Audio Only';
-                
-                // Set download link
                 document.getElementById('audio-download').href = audioUrl;
                 
-                audioEl.onloadeddata = () => {
-                    document.getElementById('audio-error').classList.add('hidden');
-                    audioEl.currentTime = time;
-                    audioEl.play().catch(e => console.log('Autoplay prevented'));
+                audioEl.onloadedmetadata = () => {
+                    console.log(`Audio metadata loaded. Duration: ${audioEl.duration}, seeking to: ${time}`);
+                    if (time > 0 && time < audioEl.duration) {
+                        audioEl.currentTime = time;
+                    }
                 };
                 
-                // Handle audio error
+                audioEl.oncanplay = () => {
+                    audioEl.play().catch(e => console.log('Autoplay prevented:', e));
+                };
+                
                 audioEl.onerror = () => {
                     console.log('Audio playback error');
                     document.getElementById('audio-error').classList.remove('hidden');
@@ -624,21 +656,56 @@
                 return;
             }
             
-            if (rec && rec.conversations && rec.conversations.length > 0) {
+            // Setup sidebar with speakers for seeking
+            const speakers = rec.speakers || [];
+            const conversations = rec.conversations || [];
+            const duration = rec.duration || 0;
+            
+            if (speakers.length > 0 || conversations.length > 0) {
                 sidebar.classList.remove('hidden');
-                convContainer.innerHTML = rec.conversations.map((conv, idx) => `
-                    <div class="p-3 mb-2 bg-[#111] rounded-lg cursor-pointer hover:bg-[#1a1a1a] ${conv.start_time === time ? 'border-l-2 border-purple' : ''}" onclick="seekTo(${conv.start_time || 0})">
-                        <div class="flex items-center justify-between mb-1">
-                            <span class="text-xs font-mono purple">${fmtDur(conv.start_time)}</span>
-                        </div>
-                        <div class="text-sm font-medium">${conv.title || `Conversation ${idx + 1}`}</div>
-                    </div>
-                `).join('');
+                let html = '';
+                
+                // Add speaker segments to sidebar
+                if (speakers.length > 0) {
+                    html += '<div class="mb-4"><div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Speakers</div>';
+                    speakers.forEach((speaker, idx) => {
+                        const seg = speaker.dialogue_segments?.[0];
+                        const segTime = seg ? (seg.start_time || ((seg.start_percent || 0) / 100 * duration)) : 0;
+                        html += `
+                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-violet-50 transition-colors" onclick="seekTo(${segTime})" data-testid="sidebar-speaker">
+                                <div class="flex items-center gap-2">
+                                    <div class="w-6 h-6 rounded-full ${speaker.is_host ? 'bg-violet-500' : 'bg-gray-300'} flex items-center justify-center">
+                                        <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
+                                    </div>
+                                    <span class="text-sm font-medium text-gray-900">${speaker.label || `Speaker ${idx + 1}`}</span>
+                                </div>
+                                <div class="text-xs text-violet-600 mt-1">${fmtDur(segTime)}</div>
+                            </div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                // Add conversation segments
+                if (conversations.length > 0) {
+                    html += '<div><div class="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2">Conversations</div>';
+                    conversations.forEach((conv, idx) => {
+                        const convTime = conv.start_time || ((conv.start_percent || 0) / 100 * duration);
+                        html += `
+                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-violet-50 transition-colors ${convTime === time ? 'border-violet-400 bg-violet-50' : ''}" onclick="seekTo(${convTime})" data-testid="sidebar-conversation">
+                                <div class="text-xs text-violet-600 font-mono mb-1">${fmtDur(convTime)}</div>
+                                <div class="text-sm font-medium text-gray-900">${conv.title || `Conversation ${idx + 1}`}</div>
+                            </div>`;
+                    });
+                    html += '</div>';
+                }
+                
+                convContainer.innerHTML = html;
             } else {
                 sidebar.classList.add('hidden');
             }
             
-            if (rec && rec.transcript && rec.transcript.trim()) {
+            // Show transcript
+            if (rec.transcript && rec.transcript.trim()) {
                 transcriptSection.classList.remove('hidden');
                 transcriptText.textContent = rec.transcript;
             } else {
@@ -650,15 +717,16 @@
         }
 
         function seekTo(time) {
+            console.log(`seekTo called: time=${time}`);
             const videoEl = document.getElementById('video');
             const audioEl = document.getElementById('audio');
             
             if (!videoEl.classList.contains('hidden')) {
                 videoEl.currentTime = time;
-                videoEl.play().catch(e => console.log('Play prevented'));
-            } else {
+                videoEl.play().catch(e => console.log('Play prevented:', e));
+            } else if (!audioEl.parentElement.classList.contains('hidden')) {
                 audioEl.currentTime = time;
-                audioEl.play().catch(e => console.log('Play prevented'));
+                audioEl.play().catch(e => console.log('Play prevented:', e));
             }
         }
 
@@ -668,9 +736,7 @@
             const targetLang = document.getElementById('translate-lang').value;
             const btn = document.getElementById('translate-btn');
             const transcriptText = document.getElementById('transcript-text');
-            const originalText = btn.textContent;
             
-            // Check if there's a transcript
             const rec = data.recordings.find(r => r.id === currentRecordingId);
             if (!rec || !rec.transcript || !rec.transcript.trim()) {
                 alert('No transcript available to translate');
@@ -681,9 +747,7 @@
             btn.disabled = true;
             
             try {
-                const response = await fetch(`${API}/recordings/${currentRecordingId}/translate?target_language=${targetLang}`, {
-                    method: 'POST'
-                });
+                const response = await fetch(`${API}/recordings/${currentRecordingId}/translate?target_language=${targetLang}`, { method: 'POST' });
                 const result = await response.json();
                 
                 if (result.success && result.translated_transcript) {
@@ -696,9 +760,9 @@
             } catch (e) {
                 console.error(e);
                 alert('Translation failed: ' + e.message);
-                btn.textContent = originalText;
             } finally {
                 btn.disabled = false;
+                btn.textContent = 'Translate';
             }
         }
 
@@ -716,36 +780,42 @@
 
         function fmtDur(s) {
             if (!s && s !== 0) return '0:00';
-            const m = Math.floor(s/60), sec = Math.floor(s%60);
-            return `${m}:${sec.toString().padStart(2,'0')}`;
+            const m = Math.floor(s / 60), sec = Math.floor(s % 60);
+            return `${m}:${sec.toString().padStart(2, '0')}`;
         }
 
         function statusClass(s) {
             return {
-                recording: 'bg-red-500/20 text-red-400',
-                completed: 'bg-yellow-500/20 text-yellow-400',
-                uploaded: 'bg-amber-500/20 text-amber-400',
-                processed: 'bg-[#8B5CF6]/20 text-[#8B5CF6]',
-                processing: 'bg-blue-500/20 text-blue-400',
-                error: 'bg-red-500/20 text-red-400'
-            }[s] || 'bg-gray-500/20 text-gray-400';
+                recording: 'bg-red-100 text-red-700',
+                completed: 'bg-yellow-100 text-yellow-700',
+                uploaded: 'bg-amber-100 text-amber-700',
+                processed: 'bg-violet-100 text-violet-700',
+                processing: 'bg-blue-100 text-blue-700',
+                error: 'bg-red-100 text-red-700'
+            }[s] || 'bg-gray-100 text-gray-700';
+        }
+
+        function sentimentClass(s) {
+            return {
+                positive: 'bg-emerald-100 text-emerald-700',
+                interested: 'bg-blue-100 text-blue-700',
+                neutral: 'bg-gray-100 text-gray-600',
+                skeptical: 'bg-amber-100 text-amber-700',
+                negative: 'bg-red-100 text-red-700'
+            }[s] || 'bg-gray-100 text-gray-600';
         }
 
         async function deleteRecording(id, name) {
-            if (!confirm(`Are you sure you want to delete "${name}"?\n\nThis action cannot be undone.`)) {
-                return;
-            }
+            if (!confirm(`Delete "${name}"?\n\nThis cannot be undone.`)) return;
             
             try {
                 const response = await fetch(`${API}/recordings/${id}`, { method: 'DELETE' });
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Remove from local data
                     data.recordings = data.recordings.filter(r => r.id !== id);
                     data.visitors = data.visitors.filter(v => v.recording_id !== id);
                     
-                    // Remove card from DOM with animation
                     const card = document.getElementById(`recording-${id}`);
                     if (card) {
                         card.style.transition = 'all 0.3s ease';
@@ -754,18 +824,15 @@
                         setTimeout(() => card.remove(), 300);
                     }
                     
-                    // Refresh insights
                     const insights = await fetch(`${API}/dashboard/insights`).then(r => r.json());
                     data.insights = insights;
-                    
-                    // Re-render if in overview
                     if (view === 'overview') render();
                 } else {
-                    alert('Failed to delete recording: ' + (result.detail || 'Unknown error'));
+                    alert('Delete failed: ' + (result.detail || 'Unknown error'));
                 }
             } catch (e) {
                 console.error(e);
-                alert('Failed to delete recording');
+                alert('Delete failed');
             }
         }
 
@@ -775,21 +842,16 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Update status in local data
                     const recording = data.recordings.find(r => r.id === id);
-                    if (recording) {
-                        recording.status = 'processing';
-                    }
+                    if (recording) recording.status = 'processing';
                     render();
-                    
-                    // Poll for status
                     pollRecordingStatus(id);
                 } else {
-                    alert('Failed to reprocess: ' + (result.detail || 'Unknown error'));
+                    alert('Reprocess failed: ' + (result.detail || 'Unknown error'));
                 }
             } catch (e) {
                 console.error(e);
-                alert('Failed to reprocess recording');
+                alert('Reprocess failed');
             }
         }
 
@@ -799,19 +861,15 @@
                     const response = await fetch(`${API}/recordings/${id}/status`);
                     const status = await response.json();
                     
-                    const recording = data.recordings.find(r => r.id === id);
-                    if (recording && status.status !== 'processing') {
-                        // Refresh full data
+                    if (status.status !== 'processing') {
                         await refresh();
-                    } else if (status.status === 'processing') {
-                        // Check again in 3 seconds
+                    } else {
                         setTimeout(checkStatus, 3000);
                     }
                 } catch (e) {
                     console.error(e);
                 }
             };
-            
             setTimeout(checkStatus, 3000);
         }
 
@@ -841,7 +899,6 @@
                 const result = await response.json();
                 
                 if (result.success) {
-                    // Update local data
                     const recording = data.recordings.find(r => r.id === id);
                     if (recording) {
                         recording.status = 'processing';
@@ -858,15 +915,12 @@
             }
         }
 
-        function sentimentClass(s) {
-            return {
-                positive: 'bg-green-500/20 text-green-400',
-                interested: 'bg-blue-500/20 text-blue-400',
-                neutral: 'bg-gray-500/20 text-gray-400',
-                skeptical: 'bg-amber-500/20 text-amber-400',
-                negative: 'bg-red-500/20 text-red-400'
-            }[s] || 'bg-gray-500/20 text-gray-400';
-        }
+        // Keyboard shortcut to close modal
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape' && !document.getElementById('modal').classList.contains('hidden')) {
+                closeModal();
+            }
+        });
     </script>
 </body>
 </html>
