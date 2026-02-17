@@ -1144,8 +1144,8 @@ async def get_video(recording_id: str, request: Request):
             start = max(0, min(start, file_size - 1))
             end = max(start, min(end, file_size - 1))
             
-            # Seek to start position
-            await grid_out.seek(start)
+            # Seek to start position (sync method in motor GridFS)
+            grid_out.seek(start)
             content_length = end - start + 1
             
             # Read the requested range
