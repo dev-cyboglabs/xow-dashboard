@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,11 +9,13 @@ import {
   RefreshControl,
   useWindowDimensions,
   Alert,
+  Modal,
 } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system';
+import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -63,6 +65,12 @@ export default function GalleryScreen() {
   const [uploadingId, setUploadingId] = useState<string | null>(null);
   const [deletingId, setDeletingId] = useState<string | null>(null);
   const [viewMode, setViewMode] = useState<'all' | 'local' | 'cloud'>('all');
+  
+  // Preview modal state
+  const [previewVisible, setPreviewVisible] = useState(false);
+  const [previewUri, setPreviewUri] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState('');
+  const videoRef = useRef<Video>(null);
 
   useEffect(() => { loadDevice(); }, []);
   useEffect(() => { if (deviceId) fetchRecordings(); }, [deviceId]);
@@ -126,6 +134,36 @@ export default function GalleryScreen() {
     }
   };
 
+  const openPreview = async (recording: CombinedRecording) => {
+    if (recording.source === 'local') {
+      const localRec = recording as LocalRecording;
+      if (localRec.videoPath) {
+        // Check if file exists
+        const fileInfo = await FileSystem.getInfoAsync(localRec.videoPath);
+        if (fileInfo.exists) {
+          setPreviewUri(localRec.videoPath);
+          setPreviewTitle(fmtDate(localRec.createdAt));
+          setPreviewVisible(true);
+        } else {
+          Alert.alert('File Not Found', 'The video file could not be found.');
+        }
+      } else {
+        Alert.alert('No Video', 'This recording does not have a video.');
+      }
+    } else {
+      // For cloud recordings, open in dashboard or show message
+      Alert.alert('Cloud Recording', 'View this recording on the web dashboard.');
+    }
+  };
+
+  const closePreview = () => {
+    setPreviewVisible(false);
+    setPreviewUri(null);
+    if (videoRef.current) {
+      videoRef.current.stopAsync();
+    }
+  };
+
   const uploadToCloud = async (recording: LocalRecording) => {
     if (!deviceId) return;
     
@@ -143,45 +181,53 @@ export default function GalleryScreen() {
 
       // Upload video if available
       if (recording.videoPath) {
-        const videoFile = new File(recording.videoPath);
-        if (videoFile.exists) {
+        const fileInfo = await FileSystem.getInfoAsync(recording.videoPath);
+        if (fileInfo.exists) {
           const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
-          const mimeType = isMovFile ? 'video/quicktime' : 'video/mp4';
-          const fileName = isMovFile ? 'recording.mov' : 'recording.mp4';
-
-          const formData = new FormData();
-          formData.append('video', {
-            uri: recording.videoPath,
-            type: mimeType,
-            name: fileName,
-          } as any);
-          formData.append('chunk_index', '0');
-          formData.append('total_chunks', '1');
-
-          await axios.post(
+          
+          console.log('Uploading video from:', recording.videoPath);
+          const uploadResult = await FileSystem.uploadAsync(
             `${API_URL}/api/recordings/${recordingId}/upload-video`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 300000 }
+            recording.videoPath,
+            {
+              fieldName: 'video',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              mimeType: isMovFile ? 'video/quicktime' : 'video/mp4',
+              parameters: {
+                chunk_index: '0',
+                total_chunks: '1',
+              },
+            }
           );
+          console.log('Video upload status:', uploadResult.status);
+          
+          if (uploadResult.status < 200 || uploadResult.status >= 300) {
+            throw new Error(`Video upload failed with status ${uploadResult.status}`);
+          }
         }
       }
 
       // Upload audio if available
       if (recording.audioPath) {
-        const audioFile = new File(recording.audioPath);
-        if (audioFile.exists) {
-          const formData = new FormData();
-          formData.append('audio', {
-            uri: recording.audioPath,
-            type: 'audio/m4a',
-            name: 'recording.m4a',
-          } as any);
-
-          await axios.post(
+        const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
+        if (fileInfo.exists) {
+          console.log('Uploading audio from:', recording.audioPath);
+          const uploadResult = await FileSystem.uploadAsync(
             `${API_URL}/api/recordings/${recordingId}/upload-audio`,
-            formData,
-            { headers: { 'Content-Type': 'multipart/form-data' }, timeout: 120000 }
+            recording.audioPath,
+            {
+              fieldName: 'audio',
+              httpMethod: 'POST',
+              uploadType: FileSystem.FileSystemUploadType.MULTIPART,
+              mimeType: 'audio/m4a',
+            }
           );
+          console.log('Audio upload status:', uploadResult.status);
+          
+          if (uploadResult.status < 200 || uploadResult.status >= 300) {
+            throw new Error(`Audio upload failed with status ${uploadResult.status}`);
+          }
         }
       }
 
@@ -240,14 +286,12 @@ export default function GalleryScreen() {
                 const localRec = item as LocalRecording;
                 if (localRec.videoPath) {
                   try {
-                    const file = new File(localRec.videoPath);
-                    if (file.exists) await file.delete();
+                    await FileSystem.deleteAsync(localRec.videoPath, { idempotent: true });
                   } catch {}
                 }
                 if (localRec.audioPath) {
                   try {
-                    const file = new File(localRec.audioPath);
-                    if (file.exists) await file.delete();
+                    await FileSystem.deleteAsync(localRec.audioPath, { idempotent: true });
                   } catch {}
                 }
                 
@@ -340,6 +384,16 @@ export default function GalleryScreen() {
             <Text style={styles.cardDuration}>{fmtDur(duration)}</Text>
           </View>
           <View style={styles.cardActions}>
+            {/* Preview Button (local only with video) */}
+            {isLocal && hasVideo && (
+              <TouchableOpacity
+                style={styles.previewBtn}
+                onPress={() => openPreview(item)}
+              >
+                <Ionicons name="play-circle" size={16} color="#8B5CF6" />
+                <Text style={styles.previewBtnText}>Preview</Text>
+              </TouchableOpacity>
+            )}
             {!isLocal && cloudItem.status === 'error' && (
               <TouchableOpacity style={styles.reprocessBtn} onPress={() => handleReprocess(cloudItem)}>
                 <Ionicons name="refresh" size={12} color="#F59E0B" />
@@ -429,7 +483,6 @@ export default function GalleryScreen() {
   const filteredRecordings = filterRecordings(recordings);
   const localCount = recordings.filter(r => r.source === 'local').length;
   const cloudCount = recordings.filter(r => r.source === 'cloud').length;
-  const processedCount = recordings.filter(r => r.source === 'cloud' && (r as CloudRecording).status === 'processed').length;
   const totalDuration = recordings.reduce((acc, r) => {
     const dur = r.source === 'local' ? (r as LocalRecording).duration : ((r as CloudRecording).duration || 0);
     return acc + dur;
@@ -471,7 +524,7 @@ export default function GalleryScreen() {
       <View style={styles.content}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Recordings</Text>
-          <Text style={styles.headerSub}>View, manage and upload your recordings</Text>
+          <Text style={styles.headerSub}>View, preview and upload your recordings</Text>
         </View>
 
         {/* Filter Tabs */}
@@ -540,6 +593,36 @@ export default function GalleryScreen() {
           />
         )}
       </View>
+
+      {/* Video Preview Modal */}
+      <Modal
+        visible={previewVisible}
+        animationType="fade"
+        transparent={true}
+        onRequestClose={closePreview}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <Text style={styles.modalTitle}>{previewTitle}</Text>
+              <TouchableOpacity style={styles.closeBtn} onPress={closePreview}>
+                <Ionicons name="close" size={24} color="#fff" />
+              </TouchableOpacity>
+            </View>
+            {previewUri && (
+              <Video
+                ref={videoRef}
+                source={{ uri: previewUri }}
+                style={styles.videoPlayer}
+                useNativeControls
+                resizeMode={ResizeMode.CONTAIN}
+                shouldPlay
+                isLooping={false}
+              />
+            )}
+          </View>
+        </View>
+      </Modal>
     </View>
   );
 }
@@ -589,6 +672,8 @@ const styles = StyleSheet.create({
   cardDate: { color: '#fff', fontSize: 12, fontWeight: '600' },
   cardDuration: { color: '#666', fontSize: 10, marginTop: 2 },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: 'rgba(139,92,246,0.15)', borderRadius: 4 },
+  previewBtnText: { color: '#8B5CF6', fontSize: 10, fontWeight: '600' },
   reprocessBtn: { padding: 6, backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 4 },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 4 },
   uploadBtnText: { color: '#10B981', fontSize: 10, fontWeight: '600' },
@@ -614,4 +699,12 @@ const styles = StyleSheet.create({
   // Summary
   summarySection: { flexDirection: 'row', alignItems: 'flex-start', gap: 6, paddingTop: 8, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
   summary: { flex: 1, color: '#888', fontSize: 10, lineHeight: 14 },
+
+  // Modal
+  modalOverlay: { flex: 1, backgroundColor: 'rgba(0,0,0,0.95)', justifyContent: 'center', alignItems: 'center' },
+  modalContent: { width: '90%', maxWidth: 600, backgroundColor: '#0a0a0a', borderRadius: 16, overflow: 'hidden', borderWidth: 1, borderColor: '#1a1a1a' },
+  modalHeader: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
+  modalTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
+  closeBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
+  videoPlayer: { width: '100%', aspectRatio: 16/9, backgroundColor: '#000' },
 });
