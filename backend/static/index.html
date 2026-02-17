@@ -1,0 +1,362 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>XoW - Expo Recording System</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+    <style>
+        * { font-family: 'Inter', sans-serif; }
+        body { background: linear-gradient(135deg, #F8FAFC 0%, #EDE9FE 50%, #F8FAFC 100%); }
+        .gradient-text { background: linear-gradient(135deg, #7C3AED, #6366F1, #8B5CF6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .glass-card { background: rgba(255, 255, 255, 0.9); backdrop-filter: blur(20px); border: 1px solid rgba(255, 255, 255, 0.8); }
+        .input-field { transition: all 0.2s ease; }
+        .input-field:focus { border-color: #7C3AED; box-shadow: 0 0 0 3px rgba(124, 58, 237, 0.15); }
+        .btn-primary { transition: all 0.2s ease; }
+        .btn-primary:hover { transform: translateY(-2px); box-shadow: 0 8px 25px rgba(124, 58, 237, 0.35); }
+        .feature-card { transition: all 0.3s ease; }
+        .feature-card:hover { transform: translateY(-5px); box-shadow: 0 15px 40px rgba(0,0,0,0.08); }
+        @keyframes float { 0%, 100% { transform: translateY(0px); } 50% { transform: translateY(-10px); } }
+        .floating { animation: float 3s ease-in-out infinite; }
+    </style>
+</head>
+<body class="min-h-screen">
+    <!-- Header -->
+    <header class="fixed top-0 left-0 right-0 z-50 bg-white/80 backdrop-blur-lg border-b border-gray-100">
+        <div class="max-w-7xl mx-auto px-6 py-4 flex items-center justify-between">
+            <div class="flex items-center gap-3">
+                <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
+                    <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                    </svg>
+                </div>
+                <div>
+                    <div class="font-bold text-gray-900 text-lg">XoW</div>
+                    <div class="text-xs text-gray-500">Expo Analytics</div>
+                </div>
+            </div>
+            <div class="flex items-center gap-4">
+                <button onclick="showLogin()" class="px-4 py-2 text-sm font-medium text-gray-700 hover:text-violet-600 transition-colors" data-testid="login-btn">
+                    Log In
+                </button>
+                <button onclick="showSignup()" class="px-5 py-2.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-sm font-medium shadow-lg shadow-violet-200 btn-primary" data-testid="signup-btn">
+                    Get Started
+                </button>
+            </div>
+        </div>
+    </header>
+
+    <!-- Hero Section -->
+    <main class="pt-24">
+        <section class="max-w-7xl mx-auto px-6 py-20">
+            <div class="grid lg:grid-cols-2 gap-16 items-center">
+                <div>
+                    <div class="inline-flex items-center gap-2 px-4 py-2 bg-violet-100 rounded-full text-violet-700 text-sm font-medium mb-6">
+                        <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        AI-Powered Analytics
+                    </div>
+                    <h1 class="text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+                        Transform Your <span class="gradient-text">Expo Experience</span>
+                    </h1>
+                    <p class="text-xl text-gray-600 mb-8 leading-relaxed">
+                        Record booth conversations, scan visitor badges, and let AI analyze every interaction. Get speaker-separated transcripts, key insights, and follow-up actions automatically.
+                    </p>
+                    <div class="flex flex-wrap gap-4">
+                        <button onclick="showSignup()" class="px-8 py-4 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl text-lg font-semibold shadow-xl shadow-violet-200 btn-primary" data-testid="hero-signup-btn">
+                            Start Free Trial
+                        </button>
+                        <button onclick="window.location.href='/api/dashboard'" class="px-8 py-4 bg-white border border-gray-200 text-gray-700 rounded-xl text-lg font-semibold hover:bg-gray-50 transition-colors" data-testid="demo-btn">
+                            View Demo
+                        </button>
+                    </div>
+                </div>
+                <div class="relative">
+                    <div class="floating">
+                        <div class="glass-card rounded-3xl p-8 shadow-2xl">
+                            <div class="flex items-center gap-4 mb-6">
+                                <div class="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                                    <svg class="w-7 h-7 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                                </div>
+                                <div>
+                                    <div class="font-semibold text-gray-900">Speaker Analysis</div>
+                                    <div class="text-sm text-gray-500">3 speakers identified</div>
+                                </div>
+                            </div>
+                            <div class="space-y-3">
+                                <div class="flex items-center gap-3 p-3 bg-violet-50 rounded-xl">
+                                    <div class="w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                                        <span class="text-white text-sm font-bold">H</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium text-gray-900">Host (Sarah)</div>
+                                        <div class="text-xs text-gray-500">Product demo, pricing discussion</div>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 bg-violet-200 text-violet-700 rounded-full">HOST</span>
+                                </div>
+                                <div class="flex items-center gap-3 p-3 bg-gray-50 rounded-xl">
+                                    <div class="w-10 h-10 rounded-full bg-gray-200 flex items-center justify-center">
+                                        <span class="text-gray-600 text-sm font-bold">G1</span>
+                                    </div>
+                                    <div class="flex-1">
+                                        <div class="text-sm font-medium text-gray-900">Guest 1</div>
+                                        <div class="text-xs text-gray-500">Integration questions</div>
+                                    </div>
+                                    <span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full">interested</span>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </section>
+
+        <!-- Features Section -->
+        <section class="max-w-7xl mx-auto px-6 py-20">
+            <div class="text-center mb-16">
+                <h2 class="text-3xl font-bold text-gray-900 mb-4">Everything You Need for Expo Success</h2>
+                <p class="text-lg text-gray-600">Powerful features to capture, analyze, and act on booth conversations</p>
+            </div>
+            <div class="grid md:grid-cols-3 gap-8">
+                <div class="feature-card glass-card rounded-2xl p-8">
+                    <div class="w-14 h-14 rounded-xl bg-violet-100 flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">AI Transcription</h3>
+                    <p class="text-gray-600">Automatic speech-to-text with speaker diarization. Identify who said what with AI-powered accuracy.</p>
+                </div>
+                <div class="feature-card glass-card rounded-2xl p-8">
+                    <div class="w-14 h-14 rounded-xl bg-emerald-100 flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v1m6 11h2m-6 0h-2v4m0-11v3m0 0h.01M12 12h4.01M16 20h4M4 12h4m12 0h.01M5 8h2a1 1 0 001-1V5a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1zm12 0h2a1 1 0 001-1V5a1 1 0 00-1-1h-2a1 1 0 00-1 1v2a1 1 0 001 1zM5 20h2a1 1 0 001-1v-2a1 1 0 00-1-1H5a1 1 0 00-1 1v2a1 1 0 001 1z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Badge Scanning</h3>
+                    <p class="text-gray-600">Scan visitor badges during conversations. Link scans to transcripts for complete visitor profiles.</p>
+                </div>
+                <div class="feature-card glass-card rounded-2xl p-8">
+                    <div class="w-14 h-14 rounded-xl bg-blue-100 flex items-center justify-center mb-6">
+                        <svg class="w-7 h-7 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"/></svg>
+                    </div>
+                    <h3 class="text-xl font-semibold text-gray-900 mb-3">Smart Insights</h3>
+                    <p class="text-gray-600">AI extracts key points, sentiment, questions asked, and generates actionable follow-up tasks.</p>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <!-- Auth Modal -->
+    <div id="auth-modal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
+        <div class="glass-card rounded-2xl w-full max-w-md mx-4 shadow-2xl overflow-hidden">
+            <!-- Login Form -->
+            <div id="login-form" class="hidden">
+                <div class="p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-200">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-900">Welcome Back</h2>
+                        <p class="text-gray-500 mt-2">Sign in to your dashboard</p>
+                    </div>
+                    <form onsubmit="handleLogin(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" id="login-email" required class="input-field w-full px-4 py-3 rounded-xl border border-gray-200 outline-none" placeholder="you@company.com" data-testid="login-email">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <input type="password" id="login-password" required class="input-field w-full px-4 py-3 rounded-xl border border-gray-200 outline-none" placeholder="Enter your password" data-testid="login-password">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full mt-6 py-3.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg shadow-violet-200 btn-primary" data-testid="login-submit">
+                            Sign In
+                        </button>
+                    </form>
+                    <p class="text-center mt-6 text-gray-600">
+                        Don't have an account? <button onclick="showSignup()" class="text-violet-600 font-medium hover:underline">Sign up</button>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Signup Form -->
+            <div id="signup-form" class="hidden">
+                <div class="p-8">
+                    <div class="text-center mb-8">
+                        <div class="w-16 h-16 rounded-2xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center mx-auto mb-4 shadow-lg shadow-violet-200">
+                            <svg class="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M18 9v3m0 0v3m0-3h3m-3 0h-3m-2-5a4 4 0 11-8 0 4 4 0 018 0zM3 20a6 6 0 0112 0v1H3v-1z"/>
+                            </svg>
+                        </div>
+                        <h2 class="text-2xl font-bold text-gray-900">Create Account</h2>
+                        <p class="text-gray-500 mt-2">Start your free trial today</p>
+                    </div>
+                    <form onsubmit="handleSignup(event)">
+                        <div class="space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Full Name</label>
+                                <input type="text" id="signup-name" required class="input-field w-full px-4 py-3 rounded-xl border border-gray-200 outline-none" placeholder="John Smith" data-testid="signup-name">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Email</label>
+                                <input type="email" id="signup-email" required class="input-field w-full px-4 py-3 rounded-xl border border-gray-200 outline-none" placeholder="you@company.com" data-testid="signup-email">
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 mb-1">Password</label>
+                                <input type="password" id="signup-password" required minlength="6" class="input-field w-full px-4 py-3 rounded-xl border border-gray-200 outline-none" placeholder="Min. 6 characters" data-testid="signup-password">
+                            </div>
+                        </div>
+                        <button type="submit" class="w-full mt-6 py-3.5 bg-gradient-to-r from-violet-600 to-purple-600 text-white rounded-xl font-semibold shadow-lg shadow-violet-200 btn-primary" data-testid="signup-submit">
+                            Create Account
+                        </button>
+                    </form>
+                    <p class="text-center mt-6 text-gray-600">
+                        Already have an account? <button onclick="showLogin()" class="text-violet-600 font-medium hover:underline">Sign in</button>
+                    </p>
+                </div>
+            </div>
+            
+            <!-- Close Button -->
+            <button onclick="closeModal()" class="absolute top-4 right-4 p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors" data-testid="close-auth-modal">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+            </button>
+        </div>
+    </div>
+
+    <!-- Message Toast -->
+    <div id="toast" class="fixed bottom-6 right-6 transform translate-y-20 opacity-0 transition-all duration-300 z-50">
+        <div class="glass-card rounded-xl px-6 py-4 shadow-xl flex items-center gap-3">
+            <div id="toast-icon" class="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                <svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
+            </div>
+            <span id="toast-message" class="text-gray-900 font-medium">Success!</span>
+        </div>
+    </div>
+
+    <script>
+        const API = '/api';
+        
+        function showLogin() {
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.getElementById('auth-modal').classList.add('flex');
+            document.getElementById('login-form').classList.remove('hidden');
+            document.getElementById('signup-form').classList.add('hidden');
+        }
+        
+        function showSignup() {
+            document.getElementById('auth-modal').classList.remove('hidden');
+            document.getElementById('auth-modal').classList.add('flex');
+            document.getElementById('signup-form').classList.remove('hidden');
+            document.getElementById('login-form').classList.add('hidden');
+        }
+        
+        function closeModal() {
+            document.getElementById('auth-modal').classList.add('hidden');
+            document.getElementById('auth-modal').classList.remove('flex');
+        }
+        
+        function showToast(message, isError = false) {
+            const toast = document.getElementById('toast');
+            const icon = document.getElementById('toast-icon');
+            const msg = document.getElementById('toast-message');
+            
+            msg.textContent = message;
+            
+            if (isError) {
+                icon.className = 'w-8 h-8 rounded-full bg-red-100 flex items-center justify-center';
+                icon.innerHTML = '<svg class="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>';
+            } else {
+                icon.className = 'w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center';
+                icon.innerHTML = '<svg class="w-5 h-5 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>';
+            }
+            
+            toast.classList.remove('translate-y-20', 'opacity-0');
+            toast.classList.add('translate-y-0', 'opacity-100');
+            
+            setTimeout(() => {
+                toast.classList.add('translate-y-20', 'opacity-0');
+                toast.classList.remove('translate-y-0', 'opacity-100');
+            }, 3000);
+        }
+        
+        async function handleLogin(event) {
+            event.preventDefault();
+            
+            const email = document.getElementById('login-email').value;
+            const password = document.getElementById('login-password').value;
+            
+            try {
+                const response = await fetch(`${API}/dashboard/auth/login`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ email, password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.setItem('xow_user', JSON.stringify(result.user));
+                    showToast('Login successful! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/api/dashboard';
+                    }, 1000);
+                } else {
+                    showToast(result.detail || 'Login failed', true);
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Login failed. Please try again.', true);
+            }
+        }
+        
+        async function handleSignup(event) {
+            event.preventDefault();
+            
+            const name = document.getElementById('signup-name').value;
+            const email = document.getElementById('signup-email').value;
+            const password = document.getElementById('signup-password').value;
+            
+            try {
+                const response = await fetch(`${API}/dashboard/auth/signup`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ name, email, password })
+                });
+                
+                const result = await response.json();
+                
+                if (result.success) {
+                    localStorage.setItem('xow_user', JSON.stringify(result.user));
+                    showToast('Account created! Redirecting...');
+                    setTimeout(() => {
+                        window.location.href = '/api/dashboard';
+                    }, 1000);
+                } else {
+                    showToast(result.detail || 'Signup failed', true);
+                }
+            } catch (e) {
+                console.error(e);
+                showToast('Signup failed. Please try again.', true);
+            }
+        }
+        
+        // Close modal on escape key
+        document.addEventListener('keydown', (e) => {
+            if (e.key === 'Escape') closeModal();
+        });
+        
+        // Close modal on backdrop click
+        document.getElementById('auth-modal').addEventListener('click', (e) => {
+            if (e.target.id === 'auth-modal') closeModal();
+        });
+        
+        // Check if user is already logged in
+        document.addEventListener('DOMContentLoaded', () => {
+            const user = localStorage.getItem('xow_user');
+            if (user) {
+                // User is logged in, could show different header state
+            }
+        });
+    </script>
+</body>
+</html>
