@@ -245,16 +245,15 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
             f"drawtext=text='REC':fontsize=12:fontcolor=0xEF4444:x=145:y=25:box=1:boxcolor=0xEF4444@0.3:boxborderw=3{font_opt}",
             
             # === TOP-RIGHT: Frame Counter (compact) ===
-            f"drawbox=x=w-115:y=15:w=100:h=35:color=black@0.6:t=fill",
-            f"drawtext=text='F\\:':fontsize=14:fontcolor=0x9CA3AF:x=w-105:y=25{font_opt}",
-            f"drawtext=text='%{{frame_num}}':start_number=1:fontsize=14:fontcolor=0x8B5CF6:x=w-85:y=25{font_opt}",
+            f"drawbox=x=w-100:y=15:w=85:h=30:color=black@0.6:t=fill",
+            f"drawtext=text='F\\: %{{frame_num}}':start_number=1:fontsize=12:fontcolor=0xFBBF24:x=w-92:y=22{font_opt}",
             
             # === BOTTOM-LEFT: Booth Name (compact) ===
-            f"drawtext=text='{safe_booth}':fontsize=16:fontcolor=white:x=20:y=h-40:box=1:boxcolor=black@0.6:boxborderw=8{font_opt}",
+            f"drawtext=text='{safe_booth}':fontsize=14:fontcolor=white:x=15:y=h-30:box=1:boxcolor=black@0.6:boxborderw=6{font_opt}",
             
-            # === BOTTOM-RIGHT: XoW Logo (clean) ===
-            f"drawbox=x=w-75:y=h-45:w=60:h=30:color=0x8B5CF6@0.9:t=fill",
-            f"drawtext=text='XoW':fontsize=18:fontcolor=white:x=w-68:y=h-40{font_opt}",
+            # === BOTTOM-RIGHT: XoW Logo (orange/red theme) ===
+            f"drawbox=x=w-55:y=h-35:w=45:h=25:color=0xE54B2A@0.9:t=fill",
+            f"drawtext=text='XoW':fontsize=14:fontcolor=white:x=w-50:y=h-31{font_opt}",
         ]
         filter_complex = ','.join(filter_parts)
         
