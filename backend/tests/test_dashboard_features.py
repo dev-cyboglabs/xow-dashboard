@@ -14,7 +14,7 @@ import json
 import tempfile
 from datetime import datetime
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/') or "https://dashboard-upgrade-39.preview.emergentagent.com"
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', '').rstrip('/') or "https://visitor-playback-dev.preview.emergentagent.com"
 
 
 class TestDashboardRecordingsAPI:

@@ -7,7 +7,7 @@ import requests
 import os
 import time
 
-BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://dashboard-upgrade-39.preview.emergentagent.com').rstrip('/')
+BASE_URL = os.environ.get('REACT_APP_BACKEND_URL', 'https://visitor-playback-dev.preview.emergentagent.com').rstrip('/')
 
 # Test Device credentials
 TEST_DEVICE_ID = f"TEST-DEVICE-{int(time.time())}"
