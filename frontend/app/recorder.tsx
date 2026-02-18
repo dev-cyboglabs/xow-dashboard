@@ -166,7 +166,14 @@ export default function RecorderScreen() {
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
       frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
 
-      if (cameraRef.current && Platform.OS !== 'web') {
+      // Show Android Expo Go limitation notice
+      if (Platform.OS === 'android' && __DEV__) {
+        console.log('Note: Video recording is limited in Expo Go on Android. For full video recording, use a development build.');
+        showToast('Audio only (Expo Go)');
+      }
+
+      if (cameraRef.current && Platform.OS !== 'web' && Platform.OS !== 'android') {
+        // Video recording works on iOS and in development builds, but not in Android Expo Go
         console.log('Starting video recording on', Platform.OS);
         setVideoRecordingActive(true);
         
@@ -186,6 +193,9 @@ export default function RecorderScreen() {
           console.log('recordAsync failed:', e?.message || e);
           setVideoRecordingActive(false);
         }
+      } else if (Platform.OS === 'android') {
+        // On Android Expo Go, only audio is recorded
+        console.log('Android detected - recording audio only (Expo Go limitation)');
       }
 
       try {
