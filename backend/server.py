@@ -212,21 +212,31 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
             recording_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
         # Escape special characters for FFmpeg drawtext
-        safe_booth = booth_name.replace("'", "").replace(":", " ").replace("\\", "")
+        safe_booth = booth_name.replace("'", "").replace(":", " ").replace("\\", "").replace('"', "")
         safe_time = recording_time.replace(":", "\\:")
+        
+        # Use DejaVu Sans font (widely available on Linux)
+        font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
+        if not os.path.exists(font_path):
+            font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
+        if not os.path.exists(font_path):
+            # Fallback: use fontconfig
+            font_path = ""
+        
+        font_opt = f":fontfile={font_path}" if font_path else ""
         
         # Build the drawtext filter for overlays
         filter_parts = [
             # Top-left: Booth name
-            f"drawtext=text='{safe_booth}':fontsize=24:fontcolor=white:x=20:y=20:box=1:boxcolor=black@0.7:boxborderw=10",
+            f"drawtext=text='{safe_booth}':fontsize=24:fontcolor=white:x=20:y=20:box=1:boxcolor=black@0.7:boxborderw=10{font_opt}",
             # Top-left below: Recording timestamp
-            f"drawtext=text='{safe_time}':fontsize=18:fontcolor=white:x=20:y=55:box=1:boxcolor=black@0.7:boxborderw=6",
+            f"drawtext=text='{safe_time}':fontsize=18:fontcolor=white:x=20:y=55:box=1:boxcolor=black@0.7:boxborderw=6{font_opt}",
             # Top-right: Frame counter
-            f"drawtext=text='FRAME\\: %{{frame_num}}':start_number=1:fontsize=16:fontcolor=cyan:x=w-tw-20:y=20:box=1:boxcolor=black@0.7:boxborderw=6",
+            f"drawtext=text='FRAME\\: %{{frame_num}}':start_number=1:fontsize=16:fontcolor=cyan:x=w-tw-20:y=20:box=1:boxcolor=black@0.7:boxborderw=6{font_opt}",
             # Bottom-right: XoW watermark
-            f"drawtext=text='XoW':fontsize=36:fontcolor=white:x=w-tw-25:y=h-th-25:box=1:boxcolor=0x8B5CF6@0.9:boxborderw=15",
+            f"drawtext=text='XoW':fontsize=36:fontcolor=white:x=w-tw-25:y=h-th-25:box=1:boxcolor=0x8B5CF6@0.9:boxborderw=15{font_opt}",
             # Bottom-left: Running timecode
-            f"drawtext=text='%{{pts\\:hms}}':fontsize=22:fontcolor=red:x=20:y=h-th-20:box=1:boxcolor=black@0.85:boxborderw=8"
+            f"drawtext=text='%{{pts\\:hms}}':fontsize=22:fontcolor=red:x=20:y=h-th-20:box=1:boxcolor=black@0.85:boxborderw=8{font_opt}"
         ]
         filter_complex = ','.join(filter_parts)
         
@@ -243,25 +253,57 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
             output_path
         ]
         
-        logger.info(f"Running FFmpeg overlay: booth={safe_booth}")
+        logger.info(f"Running FFmpeg overlay command: booth={safe_booth}, font={font_path}")
+        logger.info(f"FFmpeg command: {' '.join(cmd)}")
+        
         result = subprocess.run(cmd, capture_output=True, timeout=600)
         
         if result.returncode != 0:
-            error_msg = result.stderr.decode()[:1000]
-            logger.error(f"FFmpeg overlay failed: {error_msg}")
-            os.unlink(input_path)
+            error_msg = result.stderr.decode()[:2000]
+            logger.error(f"FFmpeg overlay failed (exit code {result.returncode}): {error_msg}")
+            # Clean up input file
+            try:
+                os.unlink(input_path)
+            except:
+                pass
+            return video_data
+        
+        # Check if output file exists and has content
+        if not os.path.exists(output_path):
+            logger.error("FFmpeg overlay: output file not created")
+            try:
+                os.unlink(input_path)
+            except:
+                pass
+            return video_data
+            
+        output_size = os.path.getsize(output_path)
+        if output_size == 0:
+            logger.error("FFmpeg overlay: output file is empty")
+            try:
+                os.unlink(input_path)
+                os.unlink(output_path)
+            except:
+                pass
             return video_data
         
         with open(output_path, 'rb') as f:
             overlay_data = f.read()
         
-        os.unlink(input_path)
-        os.unlink(output_path)
+        # Clean up temp files
+        try:
+            os.unlink(input_path)
+            os.unlink(output_path)
+        except:
+            pass
         
-        logger.info(f"Video overlay applied successfully ({len(overlay_data)} bytes)")
+        logger.info(f"Video overlay applied successfully: input={len(video_data)} bytes, output={len(overlay_data)} bytes")
         return overlay_data
+    except subprocess.TimeoutExpired:
+        logger.error("FFmpeg overlay timed out after 600 seconds")
+        return video_data
     except Exception as e:
-        logger.error(f"Video overlay exception: {e}")
+        logger.error(f"Video overlay exception: {type(e).__name__}: {e}")
         return video_data
 
 # ==================== HEALTH CHECK ====================
