@@ -492,7 +492,7 @@ export default function RecorderScreen() {
               <Text style={styles.tcLabel}>TIMECODE</Text>
               <Text style={[styles.tcVal, { color: '#EF4444' }]}>{formatTC(recordingTime)}</Text>
               <Text style={styles.tcLabel}>FRAME</Text>
-              <Text style={[styles.tcVal, { color: '#8B5CF6', fontSize: 9 }]}>{frameCount.toString().padStart(6, '0')}</Text>
+              <Text style={[styles.tcVal, { color: '#E54B2A', fontSize: 9 }]}>{frameCount.toString().padStart(6, '0')}</Text>
             </>
           )}
         </View>
@@ -509,7 +509,7 @@ export default function RecorderScreen() {
         {/* Visitor Count */}
         {isRecording && (
           <View style={styles.visitorBox}>
-            <Ionicons name="people" size={16} color="#8B5CF6" />
+            <Ionicons name="people" size={16} color="#E54B2A" />
             <Text style={styles.visitorNum}>{String(barcodeCount)}</Text>
             <Text style={styles.visitorLabel}>visitors</Text>
           </View>
@@ -526,7 +526,7 @@ export default function RecorderScreen() {
         {isSaving && (
           <View style={styles.uploadOverlay}>
             <View style={styles.uploadBox}>
-              <Ionicons name="save" size={32} color="#8B5CF6" />
+              <Ionicons name="save" size={32} color="#E54B2A" />
               <Text style={styles.uploadTitle}>Saving Recording</Text>
               <View style={styles.progressBar}>
                 <View style={[styles.progressFill, { width: `${saveProgress}%` }]} />
