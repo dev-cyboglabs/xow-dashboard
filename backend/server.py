@@ -196,6 +196,79 @@ async def remux_video_for_streaming(video_data: bytes, video_format: str = "mp4"
         logger.error(f"Video remux failed: {e}")
         return video_data  # Return original on error
 
+async def add_video_overlay(video_data: bytes, video_format: str = "mp4", 
+                           booth_name: str = "XoW Booth", 
+                           recording_time: str = None) -> bytes:
+    """Add watermark overlay to video with timestamp, booth name, frame counter, and XoW branding"""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=f'.{video_format}', delete=False) as input_file:
+            input_file.write(video_data)
+            input_path = input_file.name
+        
+        output_path = input_path.replace(f'.{video_format}', f'_overlay.{video_format}')
+        
+        # Get current timestamp for the overlay
+        if not recording_time:
+            recording_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+        
+        # Build the drawtext filter for overlays:
+        # 1. Top-left: Booth name and timestamp
+        # 2. Top-right: Frame counter
+        # 3. Bottom-right: XoW watermark
+        # 4. Bottom-left: Timecode
+        
+        filter_complex = (
+            # Top-left: Booth name (white text with black background)
+            f"drawtext=text='{booth_name}':fontsize=18:fontcolor=white:x=20:y=20:"
+            f"box=1:boxcolor=black@0.7:boxborderw=8,"
+            # Top-left below: Recording timestamp
+            f"drawtext=text='{recording_time}':fontsize=14:fontcolor=white:x=20:y=50:"
+            f"box=1:boxcolor=black@0.7:boxborderw=5,"
+            # Top-right: Frame counter (using frame number)
+            f"drawtext=text='FRAME\\: %{{frame_num}}':start_number=1:fontsize=12:fontcolor=cyan:x=w-tw-20:y=20:"
+            f"box=1:boxcolor=black@0.7:boxborderw=5,"
+            # Bottom-right: XoW watermark
+            f"drawtext=text='XoW':fontsize=28:fontcolor=white:x=w-tw-20:y=h-th-20:"
+            f"box=1:boxcolor=purple@0.8:boxborderw=10,"
+            # Bottom-left: Timecode (HH:MM:SS)
+            f"drawtext=text='%{{pts\\:hms}}':fontsize=16:fontcolor=red:x=20:y=h-th-20:"
+            f"box=1:boxcolor=black@0.8:boxborderw=6"
+        )
+        
+        cmd = [
+            'ffmpeg', '-i', input_path,
+            '-vf', filter_complex,
+            '-c:v', 'libx264',  # Re-encode video with H.264
+            '-preset', 'fast',  # Fast encoding
+            '-crf', '23',  # Good quality
+            '-c:a', 'copy',  # Copy audio without re-encoding
+            '-movflags', '+faststart',  # Enable web streaming
+            '-y',
+            output_path
+        ]
+        
+        logger.info(f"Adding video overlay with booth: {booth_name}, time: {recording_time}")
+        result = subprocess.run(cmd, capture_output=True, timeout=600)
+        
+        if result.returncode != 0:
+            logger.warning(f"FFmpeg overlay warning: {result.stderr.decode()[:500]}")
+            # Return original data if overlay fails
+            os.unlink(input_path)
+            return video_data
+        
+        with open(output_path, 'rb') as f:
+            overlay_data = f.read()
+        
+        # Cleanup temp files
+        os.unlink(input_path)
+        os.unlink(output_path)
+        
+        logger.info(f"Successfully added video overlay ({len(overlay_data)} bytes)")
+        return overlay_data
+    except Exception as e:
+        logger.error(f"Video overlay failed: {e}")
+        return video_data  # Return original on error
+
 # ==================== HEALTH CHECK ====================
 
 @api_router.get("/health")
