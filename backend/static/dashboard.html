@@ -139,7 +139,7 @@
                     <!-- Video Player -->
                     <video id="video" class="w-full aspect-video bg-gray-900" controls data-testid="video-player"></video>
                     <!-- Audio Player (shown when no video) -->
-                    <div id="audio-container" class="hidden p-8 bg-gradient-to-br from-violet-50 to-purple-50 flex flex-col items-center justify-center" style="min-height: 300px;">
+                    <div id="audio-container" class="hidden p-8 bg-gradient-to-br from-orange-50 to-red-50 flex flex-col items-center justify-center" style="min-height: 300px;">
                         <div class="w-24 h-24 rounded-full bg-gradient-to-br from-orange-500 to-red-600 flex items-center justify-center mb-6 shadow-xl shadow-orange-200">
                             <svg class="w-12 h-12 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11a7 7 0 01-7 7m0 0a7 7 0 01-7-7m7 7v4m0 0H8m4 0h4m-4-8a3 3 0 01-3-3V5a3 3 0 116 0v6a3 3 0 01-3 3z"/></svg>
                         </div>
@@ -350,7 +350,7 @@
                 
                 <!-- Overall AI Summary - Only show summary, not speaker details -->
                 ${r.overall_summary || r.summary ? `
-                <div class="p-5 bg-gradient-to-r from-violet-50 to-purple-50">
+                <div class="p-5 bg-gradient-to-r from-orange-50 to-red-50">
                     <div class="flex items-center gap-2 mb-3">
                         <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
                             <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
@@ -946,7 +946,7 @@
                         const seg = speaker.dialogue_segments?.[0];
                         const segTime = seg ? (seg.start_time || ((seg.start_percent || 0) / 100 * duration)) : 0;
                         html += `
-                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-orange-50 transition-colors" onclick="seekTo(${segTime})" data-testid="sidebar-speaker">
+                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition-colors" onclick="seekTo(${segTime})" data-testid="sidebar-speaker">
                                 <div class="flex items-center gap-2">
                                     <div class="w-6 h-6 rounded-full ${speaker.is_host ? 'bg-orange-500' : 'bg-gray-300'} flex items-center justify-center">
                                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
@@ -965,7 +965,7 @@
                     conversations.forEach((conv, idx) => {
                         const convTime = conv.start_time || ((conv.start_percent || 0) / 100 * duration);
                         html += `
-                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-orange-50 transition-colors ${convTime === time ? 'border-violet-400 bg-orange-50' : ''}" onclick="seekTo(${convTime})" data-testid="sidebar-conversation">
+                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-orange-300 hover:bg-orange-50 transition-colors ${convTime === time ? 'border-orange-400 bg-orange-50' : ''}" onclick="seekTo(${convTime})" data-testid="sidebar-conversation">
                                 <div class="text-xs text-orange-600 font-mono mb-1">${fmtDur(convTime)}</div>
                                 <div class="text-sm font-medium text-gray-900">${conv.title || `Conversation ${idx + 1}`}</div>
                             </div>`;
