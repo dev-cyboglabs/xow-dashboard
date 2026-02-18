@@ -199,7 +199,7 @@ async def remux_video_for_streaming(video_data: bytes, video_format: str = "mp4"
 async def add_video_overlay(video_data: bytes, video_format: str = "mp4", 
                            booth_name: str = "XoW Booth", 
                            recording_time: str = None) -> bytes:
-    """Add watermark overlay to video matching mobile app style: DATE, TIME, TIMECODE, FRAME, XoW logo"""
+    """Add clean, non-overlapping watermark overlay to video"""
     try:
         with tempfile.NamedTemporaryFile(suffix=f'.{video_format}', delete=False) as input_file:
             input_file.write(video_data)
@@ -211,7 +211,7 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
         if not recording_time:
             recording_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Parse date and time separately like mobile app
+        # Parse date and time
         try:
             dt = datetime.strptime(recording_time, "%Y-%m-%d %H:%M:%S")
             date_str = dt.strftime("%Y-%m-%d")
@@ -222,8 +222,11 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
         
         # Escape special characters for FFmpeg drawtext
         safe_booth = booth_name.replace("'", "").replace(":", " ").replace("\\", "").replace('"', "")
+        # Truncate long booth names
+        if len(safe_booth) > 25:
+            safe_booth = safe_booth[:22] + "..."
         
-        # Use DejaVu Sans font (widely available on Linux)
+        # Use DejaVu Sans font
         font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf"
         if not os.path.exists(font_path):
             font_path = "/usr/share/fonts/truetype/dejavu/DejaVuSans.ttf"
@@ -232,43 +235,26 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
         
         font_opt = f":fontfile={font_path}" if font_path else ""
         
-        # Build overlay matching mobile app style
+        # Clean, minimal overlay design - corners only, no overlap
         filter_parts = [
-            # === TOP-LEFT: Info Box (like mobile app tcBox) ===
-            # Background box for info panel
-            f"drawbox=x=10:y=10:w=200:h=120:color=black@0.75:t=fill",
-            # DATE label
-            f"drawtext=text='DATE':fontsize=12:fontcolor=0x9CA3AF:x=20:y=18{font_opt}",
-            # Date value
-            f"drawtext=text='{date_str}':fontsize=16:fontcolor=white:x=20:y=32{font_opt}",
-            # TIME label
-            f"drawtext=text='TIME':fontsize=12:fontcolor=0x9CA3AF:x=20:y=54{font_opt}",
-            # Time value
-            f"drawtext=text='{time_str}':fontsize=16:fontcolor=white:x=20:y=68{font_opt}",
-            # TIMECODE label
-            f"drawtext=text='TIMECODE':fontsize=12:fontcolor=0x9CA3AF:x=20:y=90{font_opt}",
-            # Running timecode (red like mobile app)
-            f"drawtext=text='%{{pts\\:hms}}':fontsize=16:fontcolor=0xEF4444:x=20:y=104{font_opt}",
+            # === TOP-LEFT: Timestamp Info (compact) ===
+            f"drawbox=x=15:y=15:w=180:h=70:color=black@0.6:t=fill",
+            f"drawtext=text='{date_str}':fontsize=14:fontcolor=white:x=25:y=25{font_opt}",
+            f"drawtext=text='{time_str}':fontsize=14:fontcolor=0x10B981:x=25:y=45{font_opt}",
+            f"drawtext=text='%{{pts\\:hms}}':fontsize=14:fontcolor=0xEF4444:x=115:y=45{font_opt}",
+            f"drawtext=text='REC':fontsize=12:fontcolor=0xEF4444:x=145:y=25:box=1:boxcolor=0xEF4444@0.3:boxborderw=3{font_opt}",
             
-            # === TOP-RIGHT: Frame Counter & REC indicator ===
-            # Frame counter background
-            f"drawbox=x=w-160:y=10:w=150:h=50:color=black@0.75:t=fill",
-            # FRAME label
-            f"drawtext=text='FRAME':fontsize=12:fontcolor=0x9CA3AF:x=w-150:y=18{font_opt}",
-            # Frame number (purple/cyan like mobile app)
-            f"drawtext=text='%{{frame_num}}':start_number=1:fontsize=18:fontcolor=0x8B5CF6:x=w-150:y=34{font_opt}",
-            # REC indicator
-            f"drawtext=text='REC':fontsize=14:fontcolor=0xEF4444:x=w-55:y=22:box=1:boxcolor=0xEF4444@0.3:boxborderw=4{font_opt}",
+            # === TOP-RIGHT: Frame Counter (compact) ===
+            f"drawbox=x=w-115:y=15:w=100:h=35:color=black@0.6:t=fill",
+            f"drawtext=text='F\\:':fontsize=14:fontcolor=0x9CA3AF:x=w-105:y=25{font_opt}",
+            f"drawtext=text='%{{frame_num}}':start_number=1:fontsize=14:fontcolor=0x8B5CF6:x=w-85:y=25{font_opt}",
             
-            # === BOTTOM-RIGHT: XoW Logo (like mobile app watermark) ===
-            # Logo background (purple like mobile brand)
-            f"drawbox=x=w-100:y=h-55:w=90:h=45:color=0x8B5CF6@0.9:t=fill",
-            # XoW text
-            f"drawtext=text='XoW':fontsize=28:fontcolor=white:x=w-85:y=h-48{font_opt}",
+            # === BOTTOM-LEFT: Booth Name (compact) ===
+            f"drawtext=text='{safe_booth}':fontsize=16:fontcolor=white:x=20:y=h-40:box=1:boxcolor=black@0.6:boxborderw=8{font_opt}",
             
-            # === TOP-CENTER: Booth Name ===
-            # Booth name background
-            f"drawtext=text='{safe_booth}':fontsize=20:fontcolor=white:x=(w-tw)/2:y=15:box=1:boxcolor=black@0.7:boxborderw=8{font_opt}",
+            # === BOTTOM-RIGHT: XoW Logo (clean) ===
+            f"drawbox=x=w-75:y=h-45:w=60:h=30:color=0x8B5CF6@0.9:t=fill",
+            f"drawtext=text='XoW':fontsize=18:fontcolor=white:x=w-68:y=h-40{font_opt}",
         ]
         filter_complex = ','.join(filter_parts)
         
