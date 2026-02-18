@@ -16,7 +16,6 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { CameraView, useCameraPermissions } from 'expo-camera';
 import { useAudioRecorder, RecordingPresets, AudioModule } from 'expo-audio';
 import * as FileSystem from 'expo-file-system/legacy';
-import { FFmpegKit, ReturnCode } from 'ffmpeg-kit-react-native';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -93,7 +92,7 @@ export default function RecorderScreen() {
     };
   }, []);
 
-  const showToast = (msg: string, isError: boolean = false) => {
+  const showToast = (msg: string) => {
     setToastMessage(msg);
     setToastVisible(true);
     Animated.sequence([
@@ -149,62 +148,6 @@ export default function RecorderScreen() {
   const formatDate = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
-  // Add video overlay using FFmpeg (burns watermarks into the video file)
-  const addVideoOverlay = async (
-    inputPath: string,
-    boothName: string,
-    duration: number,
-    timestamp: string
-  ): Promise<string | null> => {
-    try {
-      // Remove file:// prefix for FFmpeg
-      const inputFile = inputPath.replace('file://', '');
-      const outputFile = inputFile.replace('.mp4', '_overlay.mp4').replace('.mov', '_overlay.mp4');
-      
-      // Escape special characters in booth name for FFmpeg
-      const safeBoothName = boothName.replace(/'/g, "\\'").replace(/:/g, "\\:");
-      const safeTimestamp = timestamp.replace(/'/g, "\\'").replace(/:/g, "\\:");
-      
-      // Build FFmpeg filter for overlays:
-      // Top-left: Booth name + timestamp
-      // Top-right: Frame counter  
-      // Bottom-right: XoW watermark
-      // Bottom-left: Running timecode
-      const filterComplex = [
-        // Top-left: Booth name
-        `drawtext=text='${safeBoothName}':fontsize=24:fontcolor=white:x=20:y=20:box=1:boxcolor=black@0.7:boxborderw=8`,
-        // Top-left below: Timestamp
-        `drawtext=text='${safeTimestamp}':fontsize=16:fontcolor=white:x=20:y=55:box=1:boxcolor=black@0.7:boxborderw=5`,
-        // Top-right: Frame counter
-        `drawtext=text='FRAME\\: %{frame_num}':start_number=1:fontsize=14:fontcolor=cyan:x=w-tw-20:y=20:box=1:boxcolor=black@0.7:boxborderw=5`,
-        // Bottom-right: XoW watermark (purple background)
-        `drawtext=text='XoW':fontsize=32:fontcolor=white:x=w-tw-20:y=h-th-20:box=1:boxcolor=0x8B5CF6@0.9:boxborderw=12`,
-        // Bottom-left: Running timecode
-        `drawtext=text='%{pts\\:hms}':fontsize=20:fontcolor=red:x=20:y=h-th-20:box=1:boxcolor=black@0.85:boxborderw=8`
-      ].join(',');
-      
-      const ffmpegCommand = `-i "${inputFile}" -vf "${filterComplex}" -c:v mpeg4 -q:v 5 -c:a copy -y "${outputFile}"`;
-      
-      console.log('Running FFmpeg overlay command...');
-      
-      const session = await FFmpegKit.execute(ffmpegCommand);
-      const returnCode = await session.getReturnCode();
-      
-      if (ReturnCode.isSuccess(returnCode)) {
-        console.log('FFmpeg overlay succeeded');
-        // Return with file:// prefix
-        return 'file://' + outputFile;
-      } else {
-        const logs = await session.getAllLogsAsString();
-        console.log('FFmpeg overlay failed:', logs?.substring(0, 500));
-        return null;
-      }
-    } catch (e: any) {
-      console.log('FFmpeg error:', e?.message || e);
-      return null;
-    }
-  };
-
   const startRecording = async () => {
     if (!device) return;
     
@@ -217,23 +160,18 @@ export default function RecorderScreen() {
       recordingStartTime.current = Date.now();
       videoUriRef.current = null;
       
-      // Generate a local ID for the recording
       const localId = `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       setCurrentRecording({ localId });
       
-      // Start timers for UI
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
       frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
 
-      // Start video recording on camera
       if (cameraRef.current && Platform.OS !== 'web') {
         console.log('Starting video recording on', Platform.OS);
         setVideoRecordingActive(true);
         
         try {
-          cameraRef.current.recordAsync({
-            maxDuration: 3600,
-          }).then((result) => {
+          cameraRef.current.recordAsync({ maxDuration: 3600 }).then((result) => {
             console.log('Video recording result:', result);
             if (result?.uri) {
               videoUriRef.current = result.uri;
@@ -250,7 +188,6 @@ export default function RecorderScreen() {
         }
       }
 
-      // Start audio recording
       try {
         await audioRecorder.prepareToRecordAsync();
         audioRecorder.record();
@@ -262,7 +199,7 @@ export default function RecorderScreen() {
       showToast('Recording started');
     } catch (e: any) {
       console.error('Start recording error:', e?.message || e);
-      showToast('Failed to start recording', true);
+      showToast('Failed to start recording');
       setIsRecording(false);
     }
   };
@@ -281,13 +218,11 @@ export default function RecorderScreen() {
       let audioUri: string | null = null;
       let videoUri: string | null = null;
 
-      // Stop video recording first
       if (cameraRef.current && videoRecordingActive) {
         try {
           console.log('Stopping video recording...');
           cameraRef.current.stopRecording();
           
-          // Wait for video to be saved (up to 10 seconds)
           for (let i = 0; i < 100; i++) {
             await new Promise(resolve => setTimeout(resolve, 100));
             if (videoUriRef.current) {
@@ -302,7 +237,6 @@ export default function RecorderScreen() {
       }
       setVideoRecordingActive(false);
 
-      // Stop audio recording
       try {
         await audioRecorder.stop();
         audioUri = audioRecorder.uri;
@@ -311,42 +245,16 @@ export default function RecorderScreen() {
         console.log('Stop audio error:', e?.message || e);
       }
 
-      setSaveProgress(20);
+      setSaveProgress(30);
 
-      // Process video with overlay (add watermarks, timecode, etc.)
-      let savedVideoPath = videoUri;
-      let savedAudioPath = audioUri;
+      const savedVideoPath = videoUri;
+      const savedAudioPath = audioUri;
       
-      if (videoUri) {
-        console.log('Processing video with overlay...');
-        setSaveProgress(30);
-        
-        try {
-          const processedVideoPath = await addVideoOverlay(
-            videoUri,
-            device?.name || 'XoW Booth',
-            recordingTime,
-            new Date().toLocaleString()
-          );
-          
-          if (processedVideoPath) {
-            savedVideoPath = processedVideoPath;
-            console.log('Video processed with overlay:', savedVideoPath);
-          } else {
-            console.log('Overlay processing failed, using original video');
-          }
-        } catch (e: any) {
-          console.log('Video overlay error:', e?.message || e);
-          // Continue with original video if processing fails
-        }
-      }
-      
-      console.log('Final video path:', savedVideoPath);
+      console.log('Video path:', savedVideoPath);
       console.log('Audio path:', savedAudioPath);
 
-      setSaveProgress(60);
+      setSaveProgress(50);
 
-      // Save recording metadata locally
       const localRecording: LocalRecording = {
         id: '',
         localId: currentRecording.localId,
@@ -360,35 +268,28 @@ export default function RecorderScreen() {
         deviceId: device?.device_id || '',
       };
 
-      // Get existing local recordings and add new one
       const existingRecordings = await getLocalRecordings();
       existingRecordings.unshift(localRecording);
       await AsyncStorage.setItem('xow_local_recordings', JSON.stringify(existingRecordings));
       
-      setSaveProgress(80);
+      setSaveProgress(70);
 
-      // Auto upload if enabled and online
       if (autoUpload && isOnline && (savedVideoPath || savedAudioPath)) {
         showToast('Uploading to cloud...');
         try {
           await uploadRecordingToCloud(localRecording);
-          showToast(`Uploaded! ${barcodeCount} visitors${savedVideoPath ? ' • Video + Audio' : ' • Audio only'}`);
+          showToast(`Uploaded! ${barcodeCount} visitors`);
         } catch (e: any) {
           console.log('Auto upload failed:', e?.message || e);
-          showToast('Saved locally. Upload later from Gallery.', true);
+          showToast('Saved locally. Upload from Gallery.');
         }
       } else {
         const hasMedia = savedVideoPath || savedAudioPath;
-        if (hasMedia) {
-          showToast(`Saved locally! ${barcodeCount} visitors${savedVideoPath ? ' • Video + Audio' : ' • Audio only'}`);
-        } else {
-          showToast('Recording saved (no media captured)', true);
-        }
+        showToast(hasMedia ? `Saved! ${barcodeCount} visitors` : 'Recording saved');
       }
 
       setSaveProgress(100);
 
-      // Reset state
       setCurrentRecording(null);
       setRecordingTime(0);
       setFrameCount(0);
@@ -397,7 +298,7 @@ export default function RecorderScreen() {
       videoUriRef.current = null;
     } catch (e: any) {
       console.error('Stop recording error:', e?.message || e);
-      showToast('Save failed: ' + (e?.message || 'Unknown error'), true);
+      showToast('Save failed');
     } finally {
       setIsSaving(false);
       setSaveProgress(0);
@@ -417,78 +318,49 @@ export default function RecorderScreen() {
     if (!device) throw new Error('No device');
     
     console.log('Starting upload for recording:', recording.localId);
-    console.log('Video path:', recording.videoPath);
-    console.log('Audio path:', recording.audioPath);
     
-    // Create recording entry in backend
-    let recordingId: string;
-    try {
-      const res = await axios.post(`${API_URL}/api/recordings`, {
-        device_id: device.device_id,
-        expo_name: 'Expo 2025',
-        booth_name: recording.boothName,
-      });
-      recordingId = res.data.id;
-      console.log('Created recording in backend:', recordingId);
-    } catch (e: any) {
-      console.error('Failed to create recording:', e?.message || e);
-      throw new Error('Failed to create recording entry');
-    }
+    const res = await axios.post(`${API_URL}/api/recordings`, {
+      device_id: device.device_id,
+      expo_name: 'Expo 2025',
+      booth_name: recording.boothName,
+    });
+    
+    const recordingId = res.data.id;
+    console.log('Created recording in backend:', recordingId);
 
-    // Upload video if available
     if (recording.videoPath) {
       try {
         const fileInfo = await FileSystem.getInfoAsync(recording.videoPath);
-        console.log('Video file info:', fileInfo);
-        
         if (fileInfo.exists) {
           const isMovFile = recording.videoPath.toLowerCase().endsWith('.mov');
-          const uploadUrl = `${API_URL}/api/recordings/${recordingId}/upload-video`;
-          
-          console.log('Uploading video to:', uploadUrl);
+          console.log('Uploading video...');
           
           const uploadResult = await FileSystem.uploadAsync(
-            uploadUrl,
+            `${API_URL}/api/recordings/${recordingId}/upload-video`,
             recording.videoPath,
             {
               fieldName: 'video',
               httpMethod: 'POST',
               uploadType: FileSystem.FileSystemUploadType.MULTIPART,
               mimeType: isMovFile ? 'video/quicktime' : 'video/mp4',
-              parameters: {
-                chunk_index: '0',
-                total_chunks: '1',
-              },
+              parameters: { chunk_index: '0', total_chunks: '1' },
             }
           );
-          console.log('Video upload result:', uploadResult.status, uploadResult.body?.substring(0, 200));
-          
-          if (uploadResult.status < 200 || uploadResult.status >= 300) {
-            console.error('Video upload failed:', uploadResult.body);
-            throw new Error(`Video upload failed: ${uploadResult.status}`);
-          }
-        } else {
-          console.log('Video file does not exist:', recording.videoPath);
+          console.log('Video upload status:', uploadResult.status);
         }
       } catch (e: any) {
-        console.error('Video upload error:', e?.message || e);
-        // Don't throw - continue with audio upload
+        console.log('Video upload error:', e?.message || e);
       }
     }
 
-    // Upload audio if available
     if (recording.audioPath) {
       try {
         const fileInfo = await FileSystem.getInfoAsync(recording.audioPath);
-        console.log('Audio file info:', fileInfo);
-        
         if (fileInfo.exists) {
-          const uploadUrl = `${API_URL}/api/recordings/${recordingId}/upload-audio`;
-          
-          console.log('Uploading audio to:', uploadUrl);
+          console.log('Uploading audio...');
           
           const uploadResult = await FileSystem.uploadAsync(
-            uploadUrl,
+            `${API_URL}/api/recordings/${recordingId}/upload-audio`,
             recording.audioPath,
             {
               fieldName: 'audio',
@@ -497,22 +369,13 @@ export default function RecorderScreen() {
               mimeType: 'audio/m4a',
             }
           );
-          console.log('Audio upload result:', uploadResult.status, uploadResult.body?.substring(0, 200));
-          
-          if (uploadResult.status < 200 || uploadResult.status >= 300) {
-            console.error('Audio upload failed:', uploadResult.body);
-            throw new Error(`Audio upload failed: ${uploadResult.status}`);
-          }
-        } else {
-          console.log('Audio file does not exist:', recording.audioPath);
+          console.log('Audio upload status:', uploadResult.status);
         }
       } catch (e: any) {
-        console.error('Audio upload error:', e?.message || e);
-        throw new Error('Audio upload failed: ' + (e?.message || 'Unknown error'));
+        console.log('Audio upload error:', e?.message || e);
       }
     }
 
-    // Upload barcode scans
     for (const scan of recording.barcodeScansList || []) {
       try {
         await axios.post(`${API_URL}/api/barcodes`, {
@@ -524,10 +387,8 @@ export default function RecorderScreen() {
       } catch {}
     }
 
-    // Mark recording complete
     await axios.put(`${API_URL}/api/recordings/${recordingId}/complete`);
 
-    // Update local recording with server ID
     const localRecordings = await getLocalRecordings();
     const idx = localRecordings.findIndex(r => r.localId === recording.localId);
     if (idx !== -1) {
@@ -544,7 +405,6 @@ export default function RecorderScreen() {
     const bc = barcodeInput.trim();
     const ts = (Date.now() - recordingStartTime.current) / 1000;
     
-    // Store barcode locally
     const newScan: BarcodeData = {
       barcode_data: bc,
       video_timestamp: ts,
@@ -582,16 +442,10 @@ export default function RecorderScreen() {
 
   return (
     <View style={[styles.container, { width, height }]}>
-      {/* Camera View with Overlays */}
       <View style={[styles.cameraArea, { width: width - panelWidth }]}>
-        <CameraView
-          ref={cameraRef}
-          style={StyleSheet.absoluteFill}
-          facing="back"
-          mode="video"
-        />
+        <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" mode="video" />
 
-        {/* Top Bar - Device Info, Recording Status, Connection */}
+        {/* Top Bar */}
         <View style={styles.topBar}>
           <View style={styles.deviceSection}>
             <View style={styles.idBadge}>
@@ -616,7 +470,7 @@ export default function RecorderScreen() {
           </View>
         </View>
 
-        {/* Timecode Overlay - Top Left */}
+        {/* Timecode Box */}
         <View style={styles.tcBox}>
           <Text style={styles.tcLabel}>DATE</Text>
           <Text style={styles.tcVal}>{formatDate(currentTime)}</Text>
@@ -633,7 +487,7 @@ export default function RecorderScreen() {
           )}
         </View>
 
-        {/* Watermark - Bottom Right */}
+        {/* Watermark */}
         <View style={styles.watermark}>
           <View style={styles.wmIcon}>
             <Ionicons name="videocam" size={12} color="#fff" />
@@ -642,7 +496,7 @@ export default function RecorderScreen() {
           {isRecording && <Text style={styles.wmLive}>LIVE</Text>}
         </View>
 
-        {/* Visitor Count - Bottom Left */}
+        {/* Visitor Count */}
         {isRecording && (
           <View style={styles.visitorBox}>
             <Ionicons name="people" size={16} color="#8B5CF6" />
@@ -651,7 +505,7 @@ export default function RecorderScreen() {
           </View>
         )}
 
-        {/* Recording Duration - Center Bottom */}
+        {/* Duration */}
         {isRecording && (
           <View style={styles.durationBox}>
             <Text style={styles.durationText}>{formatTC(recordingTime).slice(0, 8)}</Text>
@@ -668,14 +522,11 @@ export default function RecorderScreen() {
                 <View style={[styles.progressFill, { width: `${saveProgress}%` }]} />
               </View>
               <Text style={styles.uploadPercent}>{saveProgress}%</Text>
-              <Text style={styles.uploadHint}>
-                {autoUpload ? 'Saving & uploading...' : 'Saving locally...'}
-              </Text>
             </View>
           </View>
         )}
 
-        {/* Toast Notification */}
+        {/* Toast */}
         {toastVisible && (
           <Animated.View style={[styles.toast, { opacity: toastAnim, transform: [{ translateY: toastAnim.interpolate({ inputRange: [0, 1], outputRange: [20, 0] }) }] }]}>
             <Ionicons name="checkmark-circle" size={16} color="#10B981" />
@@ -684,7 +535,7 @@ export default function RecorderScreen() {
         )}
       </View>
 
-      {/* Control Panel - Right Side */}
+      {/* Control Panel */}
       <View style={[styles.panel, { width: panelWidth }]}>
         <View>
           <Text style={styles.boothName} numberOfLines={1}>{device?.name || 'Booth'}</Text>
@@ -697,7 +548,6 @@ export default function RecorderScreen() {
           </View>
         </View>
 
-        {/* Visitor Scan Input */}
         <View style={styles.section}>
           <Text style={styles.secLabel}>VISITOR BADGE</Text>
           <View style={styles.inputRow}>
@@ -725,7 +575,6 @@ export default function RecorderScreen() {
           )}
         </View>
 
-        {/* Record/Stop Button */}
         <View style={styles.recSection}>
           <TouchableOpacity
             style={[styles.recBtn, isRecording && styles.recBtnActive]}
@@ -745,12 +594,8 @@ export default function RecorderScreen() {
           <Text style={styles.recLabel}>
             {isSaving ? 'SAVING' : isRecording ? 'STOP' : 'RECORD'}
           </Text>
-          {isRecording && (
-            <Text style={styles.recHint}>Tap to stop & save</Text>
-          )}
         </View>
 
-        {/* Bottom Actions */}
         <View style={styles.actions}>
           <TouchableOpacity style={styles.actBtn} onPress={() => router.push('/gallery')}>
             <Ionicons name="folder" size={18} color="#fff" />
@@ -774,7 +619,6 @@ const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', backgroundColor: '#000' },
   cameraArea: { flex: 1, position: 'relative' },
   
-  // Top Bar
   topBar: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   deviceSection: { gap: 4 },
   idBadge: { flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 4, gap: 4 },
@@ -793,41 +637,33 @@ const styles = StyleSheet.create({
   offlineDot: { backgroundColor: '#EF4444' },
   statusText: { color: '#fff', fontSize: 9, fontWeight: '700' },
   
-  // Timecode Box
   tcBox: { position: 'absolute', top: 55, left: 10, backgroundColor: 'rgba(0,0,0,0.9)', padding: 8, borderRadius: 6, borderLeftWidth: 3, borderLeftColor: '#8B5CF6' },
   tcLabel: { color: '#666', fontSize: 8, fontWeight: '600', marginTop: 2 },
   tcVal: { color: '#fff', fontSize: 12, fontWeight: '600', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   tcDiv: { height: 1, backgroundColor: '#333', marginVertical: 4 },
   
-  // Watermark
   watermark: { position: 'absolute', bottom: 12, right: 12, flexDirection: 'row', alignItems: 'center', backgroundColor: 'rgba(139,92,246,0.95)', paddingHorizontal: 10, paddingVertical: 6, borderRadius: 6, gap: 6 },
   wmIcon: { width: 20, height: 20, borderRadius: 5, backgroundColor: 'rgba(255,255,255,0.2)', justifyContent: 'center', alignItems: 'center' },
   wmText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
   wmLive: { color: '#fff', fontSize: 8, fontWeight: '700', backgroundColor: '#EF4444', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 2, marginLeft: 2 },
   
-  // Visitor Box
   visitorBox: { position: 'absolute', bottom: 12, left: 12, backgroundColor: 'rgba(0,0,0,0.9)', paddingHorizontal: 12, paddingVertical: 8, borderRadius: 8, flexDirection: 'row', alignItems: 'center', gap: 8 },
   visitorNum: { color: '#fff', fontSize: 22, fontWeight: '800' },
   visitorLabel: { color: '#666', fontSize: 10 },
   
-  // Duration Box
   durationBox: { position: 'absolute', bottom: 12, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.85)', paddingHorizontal: 16, paddingVertical: 8, borderRadius: 6, borderWidth: 1, borderColor: '#EF4444' },
   durationText: { color: '#EF4444', fontSize: 18, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   
-  // Save Overlay
   uploadOverlay: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(0,0,0,0.85)', justifyContent: 'center', alignItems: 'center' },
   uploadBox: { backgroundColor: '#0a0a0a', padding: 30, borderRadius: 16, alignItems: 'center', borderWidth: 1, borderColor: '#1a1a1a' },
   uploadTitle: { color: '#fff', fontSize: 16, fontWeight: '600', marginTop: 12, marginBottom: 20 },
   progressBar: { width: 200, height: 6, backgroundColor: '#1a1a1a', borderRadius: 3, overflow: 'hidden' },
   progressFill: { height: '100%', backgroundColor: '#8B5CF6', borderRadius: 3 },
   uploadPercent: { color: '#8B5CF6', fontSize: 14, fontWeight: '700', marginTop: 8 },
-  uploadHint: { color: '#666', fontSize: 11, marginTop: 8 },
   
-  // Toast
   toast: { position: 'absolute', bottom: 60, alignSelf: 'center', backgroundColor: 'rgba(0,0,0,0.95)', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 10, flexDirection: 'row', alignItems: 'center', gap: 10, borderWidth: 1, borderColor: '#10B981' },
   toastText: { color: '#fff', fontSize: 13, fontWeight: '600' },
   
-  // Control Panel
   panel: { backgroundColor: '#0a0a0a', borderLeftWidth: 1, borderLeftColor: '#1a1a1a', padding: 12, justifyContent: 'space-between' },
   boothName: { color: '#fff', fontSize: 12, fontWeight: '700', textAlign: 'center' },
   boothSub: { color: '#666', fontSize: 9, textAlign: 'center', marginTop: 2 },
@@ -849,7 +685,6 @@ const styles = StyleSheet.create({
   recordIcon: { width: 20, height: 20, borderRadius: 10, backgroundColor: '#fff' },
   stopIcon: { width: 14, height: 14, borderRadius: 2, backgroundColor: '#fff' },
   recLabel: { color: '#888', fontSize: 10, fontWeight: '700', textAlign: 'center', marginTop: 6, letterSpacing: 0.5 },
-  recHint: { color: '#555', fontSize: 8, marginTop: 2 },
   
   actions: { flexDirection: 'row', justifyContent: 'space-around', paddingTop: 10, borderTopWidth: 1, borderTopColor: '#1a1a1a' },
   actBtn: { alignItems: 'center', padding: 6 },
