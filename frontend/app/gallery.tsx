@@ -449,12 +449,12 @@ export default function GalleryScreen() {
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Ionicons name="people" size={12} color="#8B5CF6" />
-            <Text style={styles.statText}>{barcodeCount || 0} visitors</Text>
+            <Text style={styles.statText}>{String(barcodeCount || 0)} visitors</Text>
           </View>
           {!isLocal && cloudItem.total_speakers != null && cloudItem.total_speakers > 0 && (
             <View style={styles.stat}>
               <Ionicons name="chatbubbles" size={12} color="#10B981" />
-              <Text style={styles.statText}>{cloudItem.total_speakers} speakers</Text>
+              <Text style={styles.statText}>{String(cloudItem.total_speakers)} speakers</Text>
             </View>
           )}
           {!isLocal && cloudItem.host_identified === true && (
