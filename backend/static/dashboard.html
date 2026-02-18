@@ -318,6 +318,8 @@
         function renderSessionCard(r) {
             const speakers = r.speakers || [];
             const hasSpeakers = speakers.length > 0;
+            const headCount = r.head_count || 0;
+            const visitorDisplay = headCount > 0 ? `${headCount} people detected` : (r.visitor_count ? `${r.visitor_count} visitors` : '');
             
             return `
             <div class="card rounded-2xl overflow-hidden" id="recording-${r.id}" data-testid="session-card">
@@ -329,7 +331,7 @@
                         </div>
                         <div>
                             <div class="font-semibold text-lg text-gray-900">${r.booth_name}</div>
-                            <div class="text-sm text-gray-500">${fmtDate(r.start_time)} &bull; Duration: ${fmtDur(r.duration)}${r.visitor_count ? ` &bull; ${r.visitor_count} visitors` : ''}</div>
+                            <div class="text-sm text-gray-500">${fmtDate(r.start_time)} &bull; Duration: ${fmtDur(r.duration)}${visitorDisplay ? ` &bull; ${visitorDisplay}` : ''}</div>
                         </div>
                     </div>
                     <div class="flex items-center gap-3">
@@ -338,7 +340,7 @@
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/></svg>
                             Retry
                         </button>` : ''}
-                        ${(r.has_video || r.has_audio) ? `<button onclick="playMedia('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl text-white text-sm font-medium transition-all shadow-lg shadow-orange-200" data-testid="play-btn">
+                        ${(r.has_video || r.has_audio) ? `<button onclick="playMedia('${r.id}','${r.booth_name}')" class="flex items-center gap-2 px-4 py-2.5 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl text-white text-sm font-medium transition-all shadow-lg shadow-orange-200" data-testid="play-video-btn">
                             <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                             ${r.has_video ? 'Play Video' : 'Play Audio'}
                         </button>` : ''}
@@ -357,6 +359,7 @@
                         </div>
                         <span class="text-sm font-semibold text-orange-700">AI Insights</span>
                         ${r.host_identified ? `<span class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium ml-2">Host Identified</span>` : ''}
+                        ${headCount > 0 ? `<span class="text-xs px-2 py-1 bg-blue-100 text-blue-700 rounded-full font-medium ml-2">${headCount} People Detected</span>` : ''}
                     </div>
                     <p class="text-gray-700 leading-relaxed">${r.overall_summary || r.summary}</p>
                     
