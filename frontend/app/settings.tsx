@@ -5,6 +5,7 @@ import {
   TouchableOpacity,
   StyleSheet,
   Switch,
+  ScrollView,
   useWindowDimensions,
   Alert,
 } from 'react-native';
@@ -100,7 +101,7 @@ export default function SettingsScreen() {
       </View>
 
       {/* Content */}
-      <View style={styles.content}>
+      <ScrollView style={styles.content} contentContainerStyle={styles.contentInner} showsVerticalScrollIndicator={false}>
         <View style={styles.header}>
           <Text style={styles.headerTitle}>Settings</Text>
           <Text style={styles.headerSub}>Configure storage and upload preferences</Text>
@@ -227,7 +228,7 @@ export default function SettingsScreen() {
             </View>
           </View>
         </View>
-      </View>
+      </ScrollView>
     </View>
   );
 }
@@ -241,7 +242,8 @@ const styles = StyleSheet.create({
   sidebarIcon: { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
 
   // Content
-  content: { flex: 1, padding: 16 },
+  content: { flex: 1 },
+  contentInner: { padding: 16 },
   header: { marginBottom: 20 },
   headerTitle: { color: '#fff', fontSize: 20, fontWeight: '700' },
   headerSub: { color: '#555', fontSize: 11, marginTop: 4 },

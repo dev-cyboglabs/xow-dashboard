@@ -13,15 +13,26 @@
       "requireFullScreen": true,
       "infoPlist": {
         "NSCameraUsageDescription": "XoW needs camera access to record booth activity",
-        "NSMicrophoneUsageDescription": "XoW needs microphone access to record audio"
-      }
+        "NSMicrophoneUsageDescription": "XoW needs microphone access to record audio",
+        "UIStatusBarHidden": true,
+        "UIViewControllerBasedStatusBarAppearance": false
+      },
+      "bundleIdentifier": "com.devcyboglabs.xowrecorder"
+    },
+    "android": {
+      "navigationBar": { "visible": false },
+      "statusBar": { "hidden": true }
+    },
+    "androidNavigationBar": {
+      "visible": false,
+      "barStyle": "dark-content",
+      "backgroundColor": "#00000000"
     },
     "android": {
       "adaptiveIcon": {
         "foregroundImage": "./assets/images/icon.png",
         "backgroundColor": "#000"
       },
-      "edgeToEdgeEnabled": true,
       "permissions": [
         "android.permission.CAMERA",
         "android.permission.RECORD_AUDIO",

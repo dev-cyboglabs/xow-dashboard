@@ -15,7 +15,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useRouter } from 'expo-router';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as FileSystem from 'expo-file-system/legacy';
-import { Video, ResizeMode, AVPlaybackStatus } from 'expo-av';
+import { Video, ResizeMode } from 'expo-av';
 import axios from 'axios';
 
 const API_URL = process.env.EXPO_PUBLIC_BACKEND_URL || '';
@@ -70,7 +70,7 @@ export default function GalleryScreen() {
   const [previewVisible, setPreviewVisible] = useState(false);
   const [previewUri, setPreviewUri] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState('');
-  const videoRef = useRef<Video>(null);
+  const videoRef = useRef<any>(null);
 
   useEffect(() => { loadDevice(); }, []);
   useEffect(() => { if (deviceId) fetchRecordings(); }, [deviceId]);
@@ -611,7 +611,7 @@ export default function GalleryScreen() {
             </View>
             {previewUri && (
               <Video
-                ref={videoRef}
+                {...{ ref: videoRef }}
                 source={{ uri: previewUri }}
                 style={styles.videoPlayer}
                 useNativeControls
