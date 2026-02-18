@@ -257,12 +257,35 @@ export default function RecorderScreen() {
 
       setSaveProgress(20);
 
-      // For simplicity, we'll save the original URIs directly instead of copying
-      // The original URIs are in the app's cache directory and will persist
+      // Process video with overlay (add watermarks, timecode, etc.)
       let savedVideoPath = videoUri;
       let savedAudioPath = audioUri;
       
-      console.log('Video path:', savedVideoPath);
+      if (videoUri) {
+        console.log('Processing video with overlay...');
+        setSaveProgress(30);
+        
+        try {
+          const processedVideoPath = await addVideoOverlay(
+            videoUri,
+            device?.name || 'XoW Booth',
+            recordingTime,
+            new Date().toLocaleString()
+          );
+          
+          if (processedVideoPath) {
+            savedVideoPath = processedVideoPath;
+            console.log('Video processed with overlay:', savedVideoPath);
+          } else {
+            console.log('Overlay processing failed, using original video');
+          }
+        } catch (e: any) {
+          console.log('Video overlay error:', e?.message || e);
+          // Continue with original video if processing fails
+        }
+      }
+      
+      console.log('Final video path:', savedVideoPath);
       console.log('Audio path:', savedAudioPath);
 
       setSaveProgress(60);
