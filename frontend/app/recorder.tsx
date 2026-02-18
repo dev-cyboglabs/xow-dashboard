@@ -510,7 +510,7 @@ export default function RecorderScreen() {
         {isRecording && (
           <View style={styles.visitorBox}>
             <Ionicons name="people" size={16} color="#8B5CF6" />
-            <Text style={styles.visitorNum}>{barcodeCount}</Text>
+            <Text style={styles.visitorNum}>{String(barcodeCount)}</Text>
             <Text style={styles.visitorLabel}>visitors</Text>
           </View>
         )}
