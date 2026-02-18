@@ -8,30 +8,37 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
         * { font-family: 'Inter', sans-serif; }
-        body { background: linear-gradient(135deg, #F8FAFC 0%, #F1F5F9 100%); }
-        .card { background: #FFFFFF; border: 1px solid #E2E8F0; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        :root {
+            --primary: #E54B2A;
+            --primary-light: #FEF3F2;
+            --primary-dark: #C93D1E;
+        }
+        body { background: #F8FAFC; }
+        .card { background: #FFFFFF; border: 1px solid #E5E7EB; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .card:hover { box-shadow: 0 4px 12px rgba(0,0,0,0.08); }
         .fade { animation: fade 0.3s ease; }
         @keyframes fade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
         @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
         .loading { animation: pulse 1.5s infinite; }
         .nav-btn { transition: all 0.2s ease; }
-        .nav-btn:hover { background: #F1F5F9; }
-        .nav-btn.active { background: linear-gradient(135deg, #EDE9FE, #DBEAFE); color: #6366F1; font-weight: 500; }
+        .nav-btn:hover { background: #F3F4F6; }
+        .nav-btn.active { background: var(--primary-light); color: var(--primary); font-weight: 500; border-left: 3px solid var(--primary); }
         ::-webkit-scrollbar { width: 6px; height: 6px; }
         ::-webkit-scrollbar-track { background: #F1F5F9; }
         ::-webkit-scrollbar-thumb { background: #CBD5E1; border-radius: 3px; }
         ::-webkit-scrollbar-thumb:hover { background: #94A3B8; }
         .speaker-box { transition: all 0.2s ease; }
-        .speaker-box:hover { border-color: #6366F1; transform: translateY(-2px); }
-        /* Color palette */
-        .gradient-purple { background: linear-gradient(135deg, #8B5CF6, #6366F1); }
-        .gradient-blue { background: linear-gradient(135deg, #3B82F6, #06B6D4); }
-        .gradient-green { background: linear-gradient(135deg, #10B981, #14B8A6); }
-        .gradient-orange { background: linear-gradient(135deg, #F59E0B, #EF4444); }
-        .gradient-pink { background: linear-gradient(135deg, #EC4899, #8B5CF6); }
+        .speaker-box:hover { border-color: var(--primary); transform: translateY(-2px); }
+        .btn-primary { background: var(--primary); transition: all 0.2s; }
+        .btn-primary:hover { background: var(--primary-dark); transform: translateY(-1px); }
+        .text-primary { color: var(--primary); }
+        .bg-primary { background: var(--primary); }
+        .bg-primary-light { background: var(--primary-light); }
+        .border-primary { border-color: var(--primary); }
         .visitor-badge { transition: all 0.3s ease; }
-        .visitor-badge:hover { transform: scale(1.02); box-shadow: 0 8px 25px rgba(0,0,0,0.1); }
+        .visitor-badge:hover { transform: scale(1.01); box-shadow: 0 8px 25px rgba(0,0,0,0.08); }
+        .stat-card { transition: all 0.2s; }
+        .stat-card:hover { transform: translateY(-2px); }
     </style>
 </head>
 <body class="min-h-screen text-gray-900">
@@ -40,10 +47,8 @@
         <aside class="w-60 bg-white border-r border-gray-200 flex flex-col shrink-0">
             <div class="p-5 border-b border-gray-100">
                 <div class="flex items-center gap-3">
-                    <div class="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center shadow-lg shadow-violet-200">
-                        <svg class="w-5 h-5 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/>
-                        </svg>
+                    <div class="w-10 h-10 rounded-lg bg-[#E54B2A] flex items-center justify-center">
+                        <span class="text-white font-bold text-lg">X</span>
                     </div>
                     <div>
                         <div class="font-bold text-gray-900 text-lg">XoW</div>
@@ -53,19 +58,23 @@
             </div>
             
             <nav class="flex-1 p-3 space-y-1">
-                <button onclick="setView('overview')" id="nav-overview" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-overview">
+                <a href="/api/" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600 hover:text-[#E54B2A]" data-testid="nav-home">
+                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"/></svg>
+                    <span class="text-sm">Home</span>
+                </a>
+                <button onclick="setView('overview')" id="nav-overview" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600" data-testid="nav-overview">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z"/></svg>
                     <span class="text-sm">Overview</span>
                 </button>
-                <button onclick="setView('sessions')" id="nav-sessions" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-sessions">
+                <button onclick="setView('sessions')" id="nav-sessions" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600" data-testid="nav-sessions">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                     <span class="text-sm">Sessions</span>
                 </button>
-                <button onclick="setView('visitors')" id="nav-visitors" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-visitors">
+                <button onclick="setView('visitors')" id="nav-visitors" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600" data-testid="nav-visitors">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"/></svg>
                     <span class="text-sm">Visitors</span>
                 </button>
-                <button onclick="setView('devices')" id="nav-devices" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-xl text-left text-gray-600" data-testid="nav-devices">
+                <button onclick="setView('devices')" id="nav-devices" class="nav-btn w-full flex items-center gap-3 px-4 py-3 rounded-lg text-left text-gray-600" data-testid="nav-devices">
                     <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z"/></svg>
                     <span class="text-sm">Devices</span>
                 </button>
