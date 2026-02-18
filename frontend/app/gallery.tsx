@@ -449,15 +449,15 @@ export default function GalleryScreen() {
         <View style={styles.statsRow}>
           <View style={styles.stat}>
             <Ionicons name="people" size={12} color="#8B5CF6" />
-            <Text style={styles.statText}>{barcodeCount} visitors</Text>
+            <Text style={styles.statText}>{barcodeCount || 0} visitors</Text>
           </View>
-          {!isLocal && cloudItem.total_speakers && cloudItem.total_speakers > 0 && (
+          {!isLocal && cloudItem.total_speakers != null && cloudItem.total_speakers > 0 && (
             <View style={styles.stat}>
               <Ionicons name="chatbubbles" size={12} color="#10B981" />
               <Text style={styles.statText}>{cloudItem.total_speakers} speakers</Text>
             </View>
           )}
-          {!isLocal && cloudItem.host_identified && (
+          {!isLocal && cloudItem.host_identified === true && (
             <View style={styles.hostBadge}>
               <Text style={styles.hostText}>HOST ID</Text>
             </View>
@@ -470,7 +470,7 @@ export default function GalleryScreen() {
         </View>
 
         {/* Summary (cloud only) */}
-        {summaryText && (
+        {summaryText != null && summaryText !== '' && (
           <View style={styles.summarySection}>
             <Ionicons name="sparkles" size={10} color="#8B5CF6" />
             <Text style={styles.summary} numberOfLines={2}>{summaryText}</Text>
