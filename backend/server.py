@@ -924,15 +924,25 @@ async def upload_video(
                 metadata={"recording_id": recording_id, "type": "video", "mime_type": mime}
             )
             
+            # Perform head count detection from video frames
+            logger.info(f"Performing head count detection for recording {recording_id}")
+            frames = await extract_video_frames(video_data, ext, num_frames=5)
+            head_count_result = await detect_head_count_from_frames(frames)
+            
             await db.recordings.update_one(
                 {"_id": ObjectId(recording_id)},
                 {"$set": {
                     "video_file_id": str(video_id),
                     "has_video": True,
                     "video_mime_type": mime,
-                    "status": "processing"
+                    "status": "processing",
+                    "head_count": head_count_result.get("max_count", 0),
+                    "avg_head_count": head_count_result.get("avg_count", 0),
+                    "head_count_detections": head_count_result.get("detections", [])
                 }}
             )
+            
+            logger.info(f"Head count detection: max={head_count_result.get('max_count', 0)}, avg={head_count_result.get('avg_count', 0)}")
             
             # Extract audio from video and process (use original data for audio extraction)
             if background_tasks:
