@@ -211,58 +211,58 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
         if not recording_time:
             recording_time = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         
-        # Build the drawtext filter for overlays:
-        # 1. Top-left: Booth name and timestamp
-        # 2. Top-right: Frame counter
-        # 3. Bottom-right: XoW watermark
-        # 4. Bottom-left: Timecode
+        # Escape special characters for FFmpeg drawtext
+        safe_booth = booth_name.replace("'", "").replace(":", " ").replace("\\", "")
+        safe_time = recording_time.replace(":", "\\:")
         
-        filter_complex = (
-            # Top-left: Booth name (white text with black background)
-            f"drawtext=text='{booth_name}':fontsize=18:fontcolor=white:x=20:y=20:"
-            f"box=1:boxcolor=black@0.7:boxborderw=8,"
+        # Build the drawtext filter for overlays
+        filter_parts = [
+            # Top-left: Booth name
+            f"drawtext=text='{safe_booth}':fontsize=24:fontcolor=white:x=20:y=20:box=1:boxcolor=black@0.7:boxborderw=10",
             # Top-left below: Recording timestamp
-            f"drawtext=text='{recording_time}':fontsize=14:fontcolor=white:x=20:y=50:"
-            f"box=1:boxcolor=black@0.7:boxborderw=5,"
-            # Top-right: Frame counter (using frame number)
-            f"drawtext=text='FRAME\\: %{{frame_num}}':start_number=1:fontsize=12:fontcolor=cyan:x=w-tw-20:y=20:"
-            f"box=1:boxcolor=black@0.7:boxborderw=5,"
+            f"drawtext=text='{safe_time}':fontsize=18:fontcolor=white:x=20:y=55:box=1:boxcolor=black@0.7:boxborderw=6",
+            # Top-right: Frame counter
+            f"drawtext=text='FRAME\\: %{{frame_num}}':start_number=1:fontsize=16:fontcolor=cyan:x=w-tw-20:y=20:box=1:boxcolor=black@0.7:boxborderw=6",
             # Bottom-right: XoW watermark
-            f"drawtext=text='XoW':fontsize=28:fontcolor=white:x=w-tw-20:y=h-th-20:"
-            f"box=1:boxcolor=purple@0.8:boxborderw=10,"
-            # Bottom-left: Timecode (HH:MM:SS)
-            f"drawtext=text='%{{pts\\:hms}}':fontsize=16:fontcolor=red:x=20:y=h-th-20:"
-            f"box=1:boxcolor=black@0.8:boxborderw=6"
-        )
+            f"drawtext=text='XoW':fontsize=36:fontcolor=white:x=w-tw-25:y=h-th-25:box=1:boxcolor=0x8B5CF6@0.9:boxborderw=15",
+            # Bottom-left: Running timecode
+            f"drawtext=text='%{{pts\\:hms}}':fontsize=22:fontcolor=red:x=20:y=h-th-20:box=1:boxcolor=black@0.85:boxborderw=8"
+        ]
+        filter_complex = ','.join(filter_parts)
         
         cmd = [
             'ffmpeg', '-i', input_path,
             '-vf', filter_complex,
-            '-c:v', 'libx264',  # Re-encode video with H.264
-            '-preset', 'fast',  # Fast encoding
-            '-crf', '23',  # Good quality
-            '-c:a', 'copy',  # Copy audio without re-encoding
-            '-movflags', '+faststart',  # Enable web streaming
+            '-c:v', 'libx264',
+            '-preset', 'ultrafast',
+            '-crf', '23',
+            '-c:a', 'aac',
+            '-b:a', '128k',
+            '-movflags', '+faststart',
             '-y',
             output_path
         ]
         
-        logger.info(f"Adding video overlay with booth: {booth_name}, time: {recording_time}")
+        logger.info(f"Running FFmpeg overlay: booth={safe_booth}")
         result = subprocess.run(cmd, capture_output=True, timeout=600)
         
         if result.returncode != 0:
-            logger.warning(f"FFmpeg overlay warning: {result.stderr.decode()[:500]}")
-            # Return original data if overlay fails
+            error_msg = result.stderr.decode()[:1000]
+            logger.error(f"FFmpeg overlay failed: {error_msg}")
             os.unlink(input_path)
             return video_data
         
         with open(output_path, 'rb') as f:
             overlay_data = f.read()
         
-        # Cleanup temp files
         os.unlink(input_path)
         os.unlink(output_path)
         
+        logger.info(f"Video overlay applied successfully ({len(overlay_data)} bytes)")
+        return overlay_data
+    except Exception as e:
+        logger.error(f"Video overlay exception: {e}")
+        return video_data
         logger.info(f"Successfully added video overlay ({len(overlay_data)} bytes)")
         return overlay_data
     except Exception as e:
