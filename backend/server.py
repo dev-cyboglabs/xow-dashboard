@@ -118,6 +118,129 @@ def serialize_doc(doc):
             result[key] = serialize_value(value)
     return result
 
+# Extract frames from video for head count detection
+async def extract_video_frames(video_data: bytes, video_format: str = "mp4", num_frames: int = 5) -> list:
+    """Extract frames from video at regular intervals for AI analysis"""
+    try:
+        with tempfile.NamedTemporaryFile(suffix=f'.{video_format}', delete=False) as video_file:
+            video_file.write(video_data)
+            video_path = video_file.name
+        
+        # Get video duration
+        probe_cmd = ['ffprobe', '-v', 'error', '-show_entries', 'format=duration', '-of', 'default=noprint_wrappers=1:nokey=1', video_path]
+        probe_result = subprocess.run(probe_cmd, capture_output=True, timeout=30)
+        duration = float(probe_result.stdout.decode().strip()) if probe_result.returncode == 0 else 10.0
+        
+        frames = []
+        frame_dir = tempfile.mkdtemp()
+        
+        # Extract frames at regular intervals
+        interval = max(duration / (num_frames + 1), 1)
+        for i in range(num_frames):
+            timestamp = interval * (i + 1)
+            frame_path = os.path.join(frame_dir, f'frame_{i}.jpg')
+            
+            cmd = [
+                'ffmpeg', '-ss', str(timestamp), '-i', video_path,
+                '-frames:v', '1', '-q:v', '2', '-y', frame_path
+            ]
+            subprocess.run(cmd, capture_output=True, timeout=30)
+            
+            if os.path.exists(frame_path):
+                with open(frame_path, 'rb') as f:
+                    frame_data = base64.b64encode(f.read()).decode('utf-8')
+                    frames.append({
+                        'timestamp': timestamp,
+                        'data': frame_data
+                    })
+                os.unlink(frame_path)
+        
+        # Cleanup
+        os.unlink(video_path)
+        os.rmdir(frame_dir)
+        
+        logger.info(f"Extracted {len(frames)} frames from video for head count")
+        return frames
+    except Exception as e:
+        logger.error(f"Frame extraction failed: {e}")
+        return []
+
+async def detect_head_count_from_frames(frames: list) -> dict:
+    """Use OpenAI Vision to detect and count people in video frames"""
+    if not openai_client or not frames:
+        return {"max_count": 0, "avg_count": 0, "detections": []}
+    
+    try:
+        detections = []
+        
+        for frame in frames:
+            try:
+                response = openai_client.chat.completions.create(
+                    model="gpt-4o",
+                    messages=[
+                        {
+                            "role": "user",
+                            "content": [
+                                {
+                                    "type": "text",
+                                    "text": "Count the number of people visible in this image. Only count human faces/heads you can clearly see. Respond with ONLY a JSON object in this exact format: {\"count\": NUMBER, \"confidence\": \"high\"|\"medium\"|\"low\"}. Do not include any other text."
+                                },
+                                {
+                                    "type": "image_url",
+                                    "image_url": {
+                                        "url": f"data:image/jpeg;base64,{frame['data']}",
+                                        "detail": "low"
+                                    }
+                                }
+                            ]
+                        }
+                    ],
+                    max_tokens=100
+                )
+                
+                result_text = response.choices[0].message.content.strip()
+                # Parse the JSON response
+                try:
+                    result = json.loads(result_text)
+                    count = int(result.get('count', 0))
+                    confidence = result.get('confidence', 'low')
+                except:
+                    # Try to extract number from text
+                    import re
+                    numbers = re.findall(r'\d+', result_text)
+                    count = int(numbers[0]) if numbers else 0
+                    confidence = 'low'
+                
+                detections.append({
+                    'timestamp': frame['timestamp'],
+                    'count': count,
+                    'confidence': confidence
+                })
+                
+            except Exception as e:
+                logger.warning(f"Head count detection error for frame: {e}")
+                detections.append({
+                    'timestamp': frame['timestamp'],
+                    'count': 0,
+                    'confidence': 'error'
+                })
+        
+        # Calculate statistics
+        counts = [d['count'] for d in detections if d['confidence'] != 'error']
+        max_count = max(counts) if counts else 0
+        avg_count = sum(counts) / len(counts) if counts else 0
+        
+        logger.info(f"Head count detection: max={max_count}, avg={avg_count:.1f}")
+        
+        return {
+            "max_count": max_count,
+            "avg_count": round(avg_count, 1),
+            "detections": detections
+        }
+    except Exception as e:
+        logger.error(f"Head count detection failed: {e}")
+        return {"max_count": 0, "avg_count": 0, "detections": []}
+
 # Extract audio from video using ffmpeg
 async def extract_audio_from_video(video_data: bytes, video_format: str = "mp4") -> bytes:
     """Extract audio track from video file using ffmpeg"""
