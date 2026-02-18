@@ -728,9 +728,17 @@ async def upload_video(
             mime = "video/mp4"
         
         if total_chunks == 1:
+            # Get booth name from recording for overlay
+            booth_name = recording.get('booth_name', 'XoW Booth')
+            recording_time = recording.get('start_time', datetime.now()).strftime("%Y-%m-%d %H:%M:%S") if isinstance(recording.get('start_time'), datetime) else datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+            
+            # Add video overlay with timestamp, booth name, and XoW branding
+            logger.info(f"Adding video overlay for booth: {booth_name}")
+            overlay_video = await add_video_overlay(video_data, ext, booth_name, recording_time)
+            
             # Remux video for web streaming (adds faststart flag for seeking)
             logger.info(f"Remuxing video for streaming support...")
-            remuxed_video = await remux_video_for_streaming(video_data, ext)
+            remuxed_video = await remux_video_for_streaming(overlay_video, ext)
             
             # Single upload - store video
             video_id = await fs_bucket.upload_from_stream(
