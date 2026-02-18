@@ -97,15 +97,15 @@ export default function LoginScreen() {
         </View>
         <View style={styles.features}>
           <View style={styles.feature}>
-            <Ionicons name="recording" size={14} color="#8B5CF6" />
+            <Ionicons name="recording" size={14} color="#E54B2A" />
             <Text style={styles.featureText}>HD Recording</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="scan" size={14} color="#8B5CF6" />
+            <Ionicons name="scan" size={14} color="#E54B2A" />
             <Text style={styles.featureText}>Visitor Tracking</Text>
           </View>
           <View style={styles.feature}>
-            <Ionicons name="cloud" size={14} color="#8B5CF6" />
+            <Ionicons name="cloud" size={14} color="#E54B2A" />
             <Text style={styles.featureText}>Cloud Sync</Text>
           </View>
         </View>
@@ -198,7 +198,7 @@ const styles = StyleSheet.create({
     width: 50,
     height: 50,
     borderRadius: 12,
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#E54B2A',
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
@@ -272,7 +272,7 @@ const styles = StyleSheet.create({
     padding: 8,
   },
   submitBtn: {
-    backgroundColor: '#8B5CF6',
+    backgroundColor: '#E54B2A',
     borderRadius: 6,
     paddingVertical: 10,
     alignItems: 'center',
@@ -284,7 +284,7 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   switchText: {
-    color: '#8B5CF6',
+    color: '#E54B2A',
     fontSize: 11,
     textAlign: 'center',
     marginTop: 12,

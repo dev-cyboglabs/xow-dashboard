@@ -95,7 +95,7 @@ export default function SettingsScreen() {
           <Ionicons name="chevron-back" size={20} color="#fff" />
         </TouchableOpacity>
         <View style={styles.sidebarIcon}>
-          <Ionicons name="settings" size={24} color="#8B5CF6" />
+          <Ionicons name="settings" size={24} color="#E54B2A" />
         </View>
       </View>
 
@@ -110,7 +110,7 @@ export default function SettingsScreen() {
           {/* Device Info Section */}
           <View style={styles.section}>
             <View style={styles.sectionHeader}>
-              <Ionicons name="phone-portrait" size={16} color="#8B5CF6" />
+              <Ionicons name="phone-portrait" size={16} color="#E54B2A" />
               <Text style={styles.sectionTitle}>Device Info</Text>
             </View>
             <View style={styles.card}>
@@ -147,7 +147,7 @@ export default function SettingsScreen() {
                 <Switch
                   value={settings.autoUpload}
                   onValueChange={toggleAutoUpload}
-                  trackColor={{ false: '#333', true: '#8B5CF6' }}
+                  trackColor={{ false: '#333', true: '#E54B2A' }}
                   thumbColor={settings.autoUpload ? '#fff' : '#666'}
                 />
               </View>
@@ -170,7 +170,7 @@ export default function SettingsScreen() {
                 style={[styles.locationOption, settings.storageLocation === 'documents' && styles.locationActive]}
                 onPress={() => setStorageLocation('documents')}
               >
-                <Ionicons name="document-text" size={18} color={settings.storageLocation === 'documents' ? '#8B5CF6' : '#666'} />
+                <Ionicons name="document-text" size={18} color={settings.storageLocation === 'documents' ? '#E54B2A' : '#666'} />
                 <View style={styles.locationInfo}>
                   <Text style={[styles.locationTitle, settings.storageLocation === 'documents' && styles.locationTitleActive]}>
                     App Documents
@@ -178,7 +178,7 @@ export default function SettingsScreen() {
                   <Text style={styles.locationDesc}>Default app storage (recommended)</Text>
                 </View>
                 {settings.storageLocation === 'documents' && (
-                  <Ionicons name="checkmark-circle" size={20} color="#8B5CF6" />
+                  <Ionicons name="checkmark-circle" size={20} color="#E54B2A" />
                 )}
               </TouchableOpacity>
 
@@ -186,7 +186,7 @@ export default function SettingsScreen() {
                 style={[styles.locationOption, settings.storageLocation === 'internal' && styles.locationActive]}
                 onPress={() => setStorageLocation('internal')}
               >
-                <Ionicons name="phone-portrait" size={18} color={settings.storageLocation === 'internal' ? '#8B5CF6' : '#666'} />
+                <Ionicons name="phone-portrait" size={18} color={settings.storageLocation === 'internal' ? '#E54B2A' : '#666'} />
                 <View style={styles.locationInfo}>
                   <Text style={[styles.locationTitle, settings.storageLocation === 'internal' && styles.locationTitleActive]}>
                     Internal Storage
@@ -194,7 +194,7 @@ export default function SettingsScreen() {
                   <Text style={styles.locationDesc}>Device internal memory</Text>
                 </View>
                 {settings.storageLocation === 'internal' && (
-                  <Ionicons name="checkmark-circle" size={20} color="#8B5CF6" />
+                  <Ionicons name="checkmark-circle" size={20} color="#E54B2A" />
                 )}
               </TouchableOpacity>
 
@@ -202,7 +202,7 @@ export default function SettingsScreen() {
                 style={[styles.locationOption, settings.storageLocation === 'external' && styles.locationActive]}
                 onPress={() => setStorageLocation('external')}
               >
-                <Ionicons name="save" size={18} color={settings.storageLocation === 'external' ? '#8B5CF6' : '#666'} />
+                <Ionicons name="save" size={18} color={settings.storageLocation === 'external' ? '#E54B2A' : '#666'} />
                 <View style={styles.locationInfo}>
                   <Text style={[styles.locationTitle, settings.storageLocation === 'external' && styles.locationTitleActive]}>
                     External Storage
@@ -210,7 +210,7 @@ export default function SettingsScreen() {
                   <Text style={styles.locationDesc}>SD Card / USB drive (if available)</Text>
                 </View>
                 {settings.storageLocation === 'external' && (
-                  <Ionicons name="checkmark-circle" size={20} color="#8B5CF6" />
+                  <Ionicons name="checkmark-circle" size={20} color="#E54B2A" />
                 )}
               </TouchableOpacity>
             </View>
@@ -258,7 +258,7 @@ const styles = StyleSheet.create({
   infoRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
   infoLabel: { color: '#666', fontSize: 12 },
   infoValue: { color: '#fff', fontSize: 13, fontWeight: '500' },
-  codeBadge: { backgroundColor: '#8B5CF6', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
+  codeBadge: { backgroundColor: '#E54B2A', paddingHorizontal: 12, paddingVertical: 4, borderRadius: 6 },
   codeText: { color: '#fff', fontSize: 14, fontWeight: '700', fontFamily: 'monospace', letterSpacing: 2 },
   hintText: { color: '#555', fontSize: 10, marginTop: 10 },
 
@@ -270,7 +270,7 @@ const styles = StyleSheet.create({
 
   // Location Options
   locationOption: { flexDirection: 'row', alignItems: 'center', padding: 12, marginBottom: 8, borderRadius: 8, backgroundColor: '#111', borderWidth: 1, borderColor: '#222' },
-  locationActive: { borderColor: '#8B5CF6', backgroundColor: 'rgba(139,92,246,0.1)' },
+  locationActive: { borderColor: '#E54B2A', backgroundColor: 'rgba(229,75,42,0.1)' },
   locationInfo: { flex: 1, marginLeft: 12 },
   locationTitle: { color: '#888', fontSize: 13, fontWeight: '500' },
   locationTitleActive: { color: '#fff' },
