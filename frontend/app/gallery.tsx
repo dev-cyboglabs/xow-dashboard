@@ -380,7 +380,7 @@ export default function GalleryScreen() {
         {/* Header Row */}
         <View style={styles.cardHeader}>
           <View style={styles.dateSection}>
-            <Text style={styles.cardDate}>{fmtDate(dateStr)}</Text>
+            <Text style={styles.cardDate}>{dateStr ? fmtDate(dateStr) : 'Unknown date'}</Text>
             <Text style={styles.cardDuration}>{fmtDur(duration)}</Text>
           </View>
           <View style={styles.cardActions}>
