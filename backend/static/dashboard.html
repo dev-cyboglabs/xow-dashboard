@@ -517,6 +517,7 @@
             </div>`;
         }
 
+        // Functions for detailed insights (kept for backward compatibility but hidden from UI)
         function showDetailedInsights(recordingId) {
             const speakersDiv = document.getElementById(`speakers-${recordingId}`);
             if (speakersDiv) {
@@ -528,19 +529,6 @@
         function hideDetailedInsights(recordingId) {
             const speakersDiv = document.getElementById(`speakers-${recordingId}`);
             if (speakersDiv) speakersDiv.classList.add('hidden');
-        }
-
-        function toggleDialogue(recordingId, speakerIdx) {
-            const dialogueDiv = document.getElementById(`dialogue-${recordingId}-${speakerIdx}`);
-            const toggleText = document.getElementById(`toggle-text-${recordingId}-${speakerIdx}`);
-            const toggleIcon = document.getElementById(`toggle-icon-${recordingId}-${speakerIdx}`);
-            
-            if (dialogueDiv) {
-                const isHidden = dialogueDiv.classList.contains('hidden');
-                dialogueDiv.classList.toggle('hidden');
-                if (toggleText) toggleText.textContent = isHidden ? 'Hide dialogue' : 'Show full dialogue';
-                if (toggleIcon) toggleIcon.style.transform = isHidden ? 'rotate(180deg)' : 'rotate(0deg)';
-            }
         }
 
         function renderVisitors() {
