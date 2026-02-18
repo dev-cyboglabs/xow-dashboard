@@ -149,6 +149,67 @@ export default function RecorderScreen() {
   const formatDate = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
   const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
 
+  // Add video overlay using FFmpeg (burns watermarks into the video file)
+  const addVideoOverlay = async (
+    inputPath: string,
+    boothName: string,
+    duration: number,
+    timestamp: string
+  ): Promise<string | null> => {
+    try {
+      // Remove file:// prefix for FFmpeg
+      const inputFile = inputPath.replace('file://', '');
+      const outputFile = inputFile.replace('.mp4', '_overlay.mp4').replace('.mov', '_overlay.mp4');
+      
+      // Escape special characters in booth name for FFmpeg
+      const safeBoothName = boothName.replace(/'/g, "\\'").replace(/:/g, "\\:");
+      const safeTimestamp = timestamp.replace(/'/g, "\\'").replace(/:/g, "\\:");
+      
+      // Build FFmpeg filter for overlays:
+      // Top-left: Booth name + timestamp
+      // Top-right: Frame counter  
+      // Bottom-right: XoW watermark
+      // Bottom-left: Running timecode
+      const filterComplex = [
+        // Top-left: Booth name
+        `drawtext=text='${safeBoothName}':fontsize=24:fontcolor=white:x=20:y=20:box=1:boxcolor=black@0.7:boxborderw=8`,
+        // Top-left below: Timestamp
+        `drawtext=text='${safeTimestamp}':fontsize=16:fontcolor=white:x=20:y=55:box=1:boxcolor=black@0.7:boxborderw=5`,
+        // Top-right: Frame counter
+        `drawtext=text='FRAME\\: %{frame_num}':start_number=1:fontsize=14:fontcolor=cyan:x=w-tw-20:y=20:box=1:boxcolor=black@0.7:boxborderw=5`,
+        // Bottom-right: XoW watermark (purple background)
+        `drawtext=text='XoW':fontsize=32:fontcolor=white:x=w-tw-20:y=h-th-20:box=1:boxcolor=0x8B5CF6@0.9:boxborderw=12`,
+        // Bottom-left: Running timecode
+        `drawtext=text='%{pts\\:hms}':fontsize=20:fontcolor=red:x=20:y=h-th-20:box=1:boxcolor=black@0.85:boxborderw=8`
+      ].join(',');
+      
+      const ffmpegCommand = `-i "${inputFile}" -vf "${filterComplex}" -c:v mpeg4 -q:v 5 -c:a copy -y "${outputFile}"`;
+      
+      console.log('Running FFmpeg overlay command...');
+      
+      const session = await FFmpegKit.execute(ffmpegCommand);
+      const returnCode = await session.getReturnCode();
+      
+      if (ReturnCode.isSuccess(returnCode)) {
+        console.log('FFmpeg overlay succeeded');
+        // Return with file:// prefix
+        return 'file://' + outputFile;
+      } else {
+        const logs = await session.getAllLogsAsString();
+        console.log('FFmpeg overlay failed:', logs?.substring(0, 500));
+        return null;
+      }
+    } catch (e: any) {
+      console.log('FFmpeg error:', e?.message || e);
+      return null;
+    }
+  };
+    return `${h.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}:${sec.toString().padStart(2, '0')}:${f.toString().padStart(2, '0')}`;
+  };
+
+  const formatDate = (d: Date) => d.toLocaleDateString('en-US', { year: 'numeric', month: '2-digit', day: '2-digit' });
+  const formatTime = (d: Date) => d.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', second: '2-digit', hour12: false });
+
   const startRecording = async () => {
     if (!device) return;
     
