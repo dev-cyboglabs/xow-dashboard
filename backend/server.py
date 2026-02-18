@@ -1395,6 +1395,12 @@ async def get_dashboard_insights():
     total_visitors = len(visitors)
     total_duration = sum(r.get('duration', 0) or 0 for r in recordings)
     
+    # Calculate total head count from AI detection
+    total_head_count = sum(r.get('head_count', 0) or 0 for r in recordings)
+    
+    # Use head count if available, otherwise fall back to visitor badges count
+    display_visitors = total_head_count if total_head_count > 0 else total_visitors
+    
     # Aggregate top topics across all recordings
     all_topics = []
     all_questions = []
@@ -1422,12 +1428,14 @@ async def get_dashboard_insights():
             "start_time": r.get('start_time'),
             "duration": r.get('duration', 0),
             "status": r.get('status', 'unknown'),
-            "total_interactions": r.get('visitor_count', len(r.get('visitors', [])))
+            "total_interactions": r.get('head_count', 0) or r.get('visitor_count', len(r.get('visitors', []))),
+            "head_count": r.get('head_count', 0)
         })
     
     return {
         "total_recordings": total_recordings,
-        "total_visitors": total_visitors,
+        "total_visitors": display_visitors,
+        "total_head_count": total_head_count,
         "total_duration_hours": total_duration / 3600,
         "top_topics": top_topics,
         "top_questions": top_questions,
