@@ -126,7 +126,7 @@
                         <span id="modal-title" class="font-semibold text-gray-900">Recording</span>
                         <div class="flex items-center gap-2 mt-0.5">
                             <span id="modal-time" class="text-sm text-gray-500"></span>
-                            <span id="modal-type" class="text-xs px-2 py-0.5 rounded-full bg-violet-100 text-violet-700 font-medium"></span>
+                            <span id="modal-type" class="text-xs px-2 py-0.5 rounded-full bg-orange-100 text-orange-700 font-medium"></span>
                         </div>
                     </div>
                 </div>
@@ -235,8 +235,8 @@
                 <div class="grid grid-cols-4 gap-5 mb-6">
                     <div class="card rounded-2xl p-6">
                         <div class="flex items-center justify-between mb-3">
-                            <div class="w-12 h-12 rounded-xl bg-violet-100 flex items-center justify-center">
-                                <svg class="w-6 h-6 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
+                            <div class="w-12 h-12 rounded-xl bg-orange-100 flex items-center justify-center">
+                                <svg class="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z"/></svg>
                             </div>
                         </div>
                         <div class="text-3xl font-bold text-gray-900">${i.total_recordings || 0}</div>
@@ -275,7 +275,7 @@
                 <div class="card rounded-2xl p-6 mb-6">
                     <h3 class="font-semibold text-gray-900 mb-4">Top Discussion Topics</h3>
                     <div class="flex flex-wrap gap-2">
-                        ${i.top_topics.map(t => `<span class="px-4 py-2 bg-violet-50 text-violet-700 rounded-full text-sm font-medium">${t}</span>`).join('')}
+                        ${i.top_topics.map(t => `<span class="px-4 py-2 bg-orange-50 text-orange-700 rounded-full text-sm font-medium">${t}</span>`).join('')}
                     </div>
                 </div>` : ''}
                 
@@ -352,10 +352,10 @@
                 ${r.overall_summary || r.summary ? `
                 <div class="p-5 bg-gradient-to-r from-violet-50 to-purple-50">
                     <div class="flex items-center gap-2 mb-3">
-                        <div class="w-8 h-8 rounded-lg bg-violet-100 flex items-center justify-center">
-                            <svg class="w-4 h-4 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
+                        <div class="w-8 h-8 rounded-lg bg-orange-100 flex items-center justify-center">
+                            <svg class="w-4 h-4 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.663 17h4.673M12 3v1m6.364 1.636l-.707.707M21 12h-1M4 12H3m3.343-5.657l-.707-.707m2.828 9.9a5 5 0 117.072 0l-.548.547A3.374 3.374 0 0014 18.469V19a2 2 0 11-4 0v-.531c0-.895-.356-1.754-.988-2.386l-.548-.547z"/></svg>
                         </div>
-                        <span class="text-sm font-semibold text-violet-700">AI Insights</span>
+                        <span class="text-sm font-semibold text-orange-700">AI Insights</span>
                         ${r.host_identified ? `<span class="text-xs px-2 py-1 bg-emerald-100 text-emerald-700 rounded-full font-medium ml-2">Host Identified</span>` : ''}
                     </div>
                     <p class="text-gray-700 leading-relaxed">${r.overall_summary || r.summary}</p>
@@ -369,9 +369,9 @@
                     <!-- Key Insights -->
                     ${r.key_insights && r.key_insights.length > 0 ? `
                     <div class="mt-4 pt-4 border-t border-violet-100">
-                        <div class="text-xs text-violet-600 font-semibold mb-2">Key Insights</div>
+                        <div class="text-xs text-orange-600 font-semibold mb-2">Key Insights</div>
                         <ul class="text-sm text-gray-600 space-y-1">
-                            ${r.key_insights.slice(0, 3).map(i => `<li class="flex items-start gap-2"><span class="text-violet-500 mt-1">&#8226;</span>${i}</li>`).join('')}
+                            ${r.key_insights.slice(0, 3).map(i => `<li class="flex items-start gap-2"><span class="text-orange-500 mt-1">&#8226;</span>${i}</li>`).join('')}
                         </ul>
                     </div>` : ''}
                 </div>` : r.status === 'processing' || r.status === 'uploaded' ? `
@@ -528,8 +528,8 @@
                 
                 ${allConversations.length === 0 && barcodeScans.length === 0 ? 
                     `<div class="card rounded-2xl p-12 text-center">
-                        <div class="w-20 h-20 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-6">
-                            <svg class="w-10 h-10 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+                        <div class="w-20 h-20 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
                         </div>
                         <h3 class="text-lg font-semibold text-gray-900 mb-2">No Visitor Conversations Yet</h3>
                         <p class="text-gray-500">Upload a recording and let AI analyze it to see visitor conversations here.</p>
@@ -565,7 +565,7 @@
                                         <!-- Topics -->
                                         ${conv.topics && conv.topics.length > 0 ? `
                                         <div class="flex flex-wrap gap-2 mb-3">
-                                            ${conv.topics.slice(0, 4).map(t => `<span class="text-xs px-3 py-1.5 bg-violet-50 text-violet-700 rounded-full font-medium">${t}</span>`).join('')}
+                                            ${conv.topics.slice(0, 4).map(t => `<span class="text-xs px-3 py-1.5 bg-orange-50 text-orange-700 rounded-full font-medium">${t}</span>`).join('')}
                                         </div>` : ''}
                                         
                                         <!-- Questions -->
@@ -581,7 +581,7 @@
                                     <!-- Right: Play Button -->
                                     <div class="w-48 bg-gradient-to-br from-slate-50 to-gray-100 flex flex-col items-center justify-center p-4 border-l border-gray-100">
                                         <div class="text-xs text-gray-500 mb-2">Start Time</div>
-                                        <div class="text-2xl font-bold text-violet-600 mb-4">${fmtDur(conv.start_time || 0)}</div>
+                                        <div class="text-2xl font-bold text-orange-600 mb-4">${fmtDur(conv.start_time || 0)}</div>
                                         ${conv.recording && (conv.recording.has_video || conv.recording.has_audio) ? `
                                         <button onclick="playMedia('${conv.recording_id}','${conv.recording?.booth_name||''}',${conv.start_time || 0})" class="w-full flex items-center justify-center gap-2 py-3 px-4 bg-gradient-to-r from-orange-500 to-red-500 hover:from-orange-600 hover:to-red-600 rounded-xl text-white font-medium transition-all shadow-lg shadow-orange-200 hover:shadow-xl group" data-testid="play-visitor-label-btn">
                                             <svg class="w-5 h-5 group-hover:scale-110 transition-transform" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
@@ -613,7 +613,7 @@
                                     </div>
                                 </div>
                                 ${rec && (rec.has_video || rec.has_audio) ? `
-                                <button onclick="playMedia('${v.recording_id}','${rec?.booth_name||''}',${v.video_timestamp || 0})" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-violet-50 hover:bg-violet-100 rounded-lg text-violet-700 text-sm font-medium transition-colors">
+                                <button onclick="playMedia('${v.recording_id}','${rec?.booth_name||''}',${v.video_timestamp || 0})" class="w-full flex items-center justify-center gap-2 py-2 px-3 bg-orange-50 hover:bg-orange-100 rounded-lg text-orange-700 text-sm font-medium transition-colors">
                                     <svg class="w-4 h-4" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                                     Play @ ${fmtDur(v.video_timestamp || 0)}
                                 </button>` : ''}
@@ -648,8 +648,8 @@
             if (!user) {
                 return `<div class="fade">
                     <div class="card rounded-2xl p-12 text-center">
-                        <div class="w-20 h-20 rounded-2xl bg-violet-100 flex items-center justify-center mx-auto mb-6">
-                            <svg class="w-10 h-10 text-violet-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
+                        <div class="w-20 h-20 rounded-2xl bg-orange-100 flex items-center justify-center mx-auto mb-6">
+                            <svg class="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z"/></svg>
                         </div>
                         <h3 class="text-xl font-semibold text-gray-900 mb-2">Login Required</h3>
                         <p class="text-gray-500 mb-6">Please log in to manage your devices</p>
@@ -719,8 +719,8 @@
                     <h3 class="font-semibold text-gray-900 mb-4">How to Connect a Device</h3>
                     <div class="grid md:grid-cols-3 gap-6">
                         <div class="flex gap-4">
-                            <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-                                <span class="text-violet-600 font-bold">1</span>
+                            <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-orange-600 font-bold">1</span>
                             </div>
                             <div>
                                 <div class="font-medium text-gray-900">Get Device Code</div>
@@ -728,8 +728,8 @@
                             </div>
                         </div>
                         <div class="flex gap-4">
-                            <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-                                <span class="text-violet-600 font-bold">2</span>
+                            <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-orange-600 font-bold">2</span>
                             </div>
                             <div>
                                 <div class="font-medium text-gray-900">Add Device Here</div>
@@ -737,8 +737,8 @@
                             </div>
                         </div>
                         <div class="flex gap-4">
-                            <div class="w-10 h-10 rounded-full bg-violet-100 flex items-center justify-center flex-shrink-0">
-                                <span class="text-violet-600 font-bold">3</span>
+                            <div class="w-10 h-10 rounded-full bg-orange-100 flex items-center justify-center flex-shrink-0">
+                                <span class="text-orange-600 font-bold">3</span>
                             </div>
                             <div>
                                 <div class="font-medium text-gray-900">Enter OTP</div>
@@ -819,7 +819,7 @@
                                 <svg class="w-8 h-8 text-emerald-600" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"/></svg>
                             </div>
                             <h4 class="font-semibold text-gray-900 mb-2">Enter this OTP on your mobile app</h4>
-                            <div class="text-4xl font-bold text-violet-600 font-mono tracking-[0.3em] py-4">${result.otp}</div>
+                            <div class="text-4xl font-bold text-orange-600 font-mono tracking-[0.3em] py-4">${result.otp}</div>
                             <p class="text-sm text-gray-500 mb-4">This code expires in ${result.expires_in_minutes} minutes</p>
                             <button onclick="closeAddDeviceModal(); loadDevices().then(() => render());" class="w-full py-3 bg-gray-100 hover:bg-gray-200 rounded-xl font-medium text-gray-700 transition-colors">
                                 Done
@@ -946,14 +946,14 @@
                         const seg = speaker.dialogue_segments?.[0];
                         const segTime = seg ? (seg.start_time || ((seg.start_percent || 0) / 100 * duration)) : 0;
                         html += `
-                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-violet-50 transition-colors" onclick="seekTo(${segTime})" data-testid="sidebar-speaker">
+                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-orange-50 transition-colors" onclick="seekTo(${segTime})" data-testid="sidebar-speaker">
                                 <div class="flex items-center gap-2">
-                                    <div class="w-6 h-6 rounded-full ${speaker.is_host ? 'bg-violet-500' : 'bg-gray-300'} flex items-center justify-center">
+                                    <div class="w-6 h-6 rounded-full ${speaker.is_host ? 'bg-orange-500' : 'bg-gray-300'} flex items-center justify-center">
                                         <svg class="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0z"/></svg>
                                     </div>
                                     <span class="text-sm font-medium text-gray-900">${speaker.label || `Speaker ${idx + 1}`}</span>
                                 </div>
-                                <div class="text-xs text-violet-600 mt-1">${fmtDur(segTime)}</div>
+                                <div class="text-xs text-orange-600 mt-1">${fmtDur(segTime)}</div>
                             </div>`;
                     });
                     html += '</div>';
@@ -965,8 +965,8 @@
                     conversations.forEach((conv, idx) => {
                         const convTime = conv.start_time || ((conv.start_percent || 0) / 100 * duration);
                         html += `
-                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-violet-50 transition-colors ${convTime === time ? 'border-violet-400 bg-violet-50' : ''}" onclick="seekTo(${convTime})" data-testid="sidebar-conversation">
-                                <div class="text-xs text-violet-600 font-mono mb-1">${fmtDur(convTime)}</div>
+                            <div class="p-3 mb-2 bg-white rounded-lg border border-gray-200 cursor-pointer hover:border-violet-300 hover:bg-orange-50 transition-colors ${convTime === time ? 'border-violet-400 bg-orange-50' : ''}" onclick="seekTo(${convTime})" data-testid="sidebar-conversation">
+                                <div class="text-xs text-orange-600 font-mono mb-1">${fmtDur(convTime)}</div>
                                 <div class="text-sm font-medium text-gray-900">${conv.title || `Conversation ${idx + 1}`}</div>
                             </div>`;
                     });
@@ -1063,7 +1063,7 @@
                 recording: 'bg-red-100 text-red-700',
                 completed: 'bg-yellow-100 text-yellow-700',
                 uploaded: 'bg-amber-100 text-amber-700',
-                processed: 'bg-violet-100 text-violet-700',
+                processed: 'bg-orange-100 text-orange-700',
                 processing: 'bg-blue-100 text-blue-700',
                 error: 'bg-red-100 text-red-700'
             }[s] || 'bg-gray-100 text-gray-700';
