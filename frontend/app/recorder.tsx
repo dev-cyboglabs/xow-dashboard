@@ -439,9 +439,9 @@ export default function RecorderScreen() {
   if (!cameraPermission?.granted) {
     return (
       <View style={[styles.container, { width, height, justifyContent: 'center', alignItems: 'center' }]}>
-        <Ionicons name="videocam-off" size={40} color="#8B5CF6" />
+        <Ionicons name="videocam-off" size={40} color="#E54B2A" />
         <Text style={{ color: '#fff', marginTop: 12, fontSize: 16 }}>Camera Permission Required</Text>
-        <TouchableOpacity onPress={requestCameraPermission} style={{ marginTop: 16, backgroundColor: '#8B5CF6', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}>
+        <TouchableOpacity onPress={requestCameraPermission} style={{ marginTop: 16, backgroundColor: '#E54B2A', paddingHorizontal: 20, paddingVertical: 10, borderRadius: 8 }}>
           <Text style={{ color: '#fff', fontWeight: '600' }}>Enable Camera</Text>
         </TouchableOpacity>
       </View>
@@ -459,11 +459,11 @@ export default function RecorderScreen() {
         <View style={styles.topBar}>
           <View style={styles.deviceSection}>
             <View style={styles.idBadge}>
-              <Ionicons name="hardware-chip" size={10} color="#8B5CF6" />
+              <Ionicons name="hardware-chip" size={10} color="#E54B2A" />
               <Text style={styles.idText}>{device?.device_id || '---'}</Text>
             </View>
             <View style={styles.brandBadge}>
-              <Ionicons name="videocam" size={8} color="#8B5CF6" />
+              <Ionicons name="videocam" size={8} color="#E54B2A" />
               <Text style={styles.brandText}>XoW</Text>
             </View>
           </View>
