@@ -263,11 +263,6 @@ async def add_video_overlay(video_data: bytes, video_format: str = "mp4",
     except Exception as e:
         logger.error(f"Video overlay exception: {e}")
         return video_data
-        logger.info(f"Successfully added video overlay ({len(overlay_data)} bytes)")
-        return overlay_data
-    except Exception as e:
-        logger.error(f"Video overlay failed: {e}")
-        return video_data  # Return original on error
 
 # ==================== HEALTH CHECK ====================
 
