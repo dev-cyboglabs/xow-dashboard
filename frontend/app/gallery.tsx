@@ -344,7 +344,7 @@ export default function GalleryScreen() {
     recording: { color: '#EF4444', icon: 'radio-button-on', label: 'Recording' },
     completed: { color: '#F59E0B', icon: 'checkmark-circle', label: 'Completed' },
     uploaded: { color: '#3B82F6', icon: 'cloud-done', label: 'Uploaded' },
-    processing: { color: '#8B5CF6', icon: 'hourglass', label: 'Processing' },
+    processing: { color: '#E54B2A', icon: 'hourglass', label: 'Processing' },
     processed: { color: '#10B981', icon: 'sparkles', label: 'AI Ready' },
     error: { color: '#EF4444', icon: 'alert-circle', label: 'Error' },
   };
@@ -390,7 +390,7 @@ export default function GalleryScreen() {
                 style={styles.previewBtn}
                 onPress={() => openPreview(item)}
               >
-                <Ionicons name="play-circle" size={16} color="#8B5CF6" />
+                <Ionicons name="play-circle" size={16} color="#E54B2A" />
                 <Text style={styles.previewBtnText}>Preview</Text>
               </TouchableOpacity>
             )}
@@ -448,7 +448,7 @@ export default function GalleryScreen() {
         {/* Stats Row */}
         <View style={styles.statsRow}>
           <View style={styles.stat}>
-            <Ionicons name="people" size={12} color="#8B5CF6" />
+            <Ionicons name="people" size={12} color="#E54B2A" />
             <Text style={styles.statText}>{String(barcodeCount || 0)} visitors</Text>
           </View>
           {!isLocal && cloudItem.total_speakers != null && cloudItem.total_speakers > 0 && (
@@ -472,7 +472,7 @@ export default function GalleryScreen() {
         {/* Summary (cloud only) */}
         {summaryText != null && summaryText !== '' && (
           <View style={styles.summarySection}>
-            <Ionicons name="sparkles" size={10} color="#8B5CF6" />
+            <Ionicons name="sparkles" size={10} color="#E54B2A" />
             <Text style={styles.summary} numberOfLines={2}>{summaryText}</Text>
           </View>
         )}
@@ -510,13 +510,13 @@ export default function GalleryScreen() {
             <Text style={styles.sideStatLabel}>Cloud</Text>
           </View>
           <View style={styles.sideStat}>
-            <Text style={[styles.sideStatNum, { color: '#8B5CF6', fontSize: 14 }]}>{fmtDur(totalDuration)}</Text>
+            <Text style={[styles.sideStatNum, { color: '#E54B2A', fontSize: 14 }]}>{fmtDur(totalDuration)}</Text>
             <Text style={styles.sideStatLabel}>Duration</Text>
           </View>
         </View>
 
         <TouchableOpacity style={styles.refreshBtn} onPress={() => { setRefreshing(true); fetchRecordings(); }}>
-          <Ionicons name="refresh" size={18} color="#8B5CF6" />
+          <Ionicons name="refresh" size={18} color="#E54B2A" />
         </TouchableOpacity>
       </View>
 
@@ -539,21 +539,21 @@ export default function GalleryScreen() {
             style={[styles.filterTab, viewMode === 'local' && styles.filterTabActive]}
             onPress={() => setViewMode('local')}
           >
-            <Ionicons name="save" size={12} color={viewMode === 'local' ? '#8B5CF6' : '#666'} />
+            <Ionicons name="save" size={12} color={viewMode === 'local' ? '#E54B2A' : '#666'} />
             <Text style={[styles.filterTabText, viewMode === 'local' && styles.filterTabTextActive]}>Local ({localCount})</Text>
           </TouchableOpacity>
           <TouchableOpacity
             style={[styles.filterTab, viewMode === 'cloud' && styles.filterTabActive]}
             onPress={() => setViewMode('cloud')}
           >
-            <Ionicons name="cloud" size={12} color={viewMode === 'cloud' ? '#8B5CF6' : '#666'} />
+            <Ionicons name="cloud" size={12} color={viewMode === 'cloud' ? '#E54B2A' : '#666'} />
             <Text style={[styles.filterTabText, viewMode === 'cloud' && styles.filterTabTextActive]}>Cloud ({cloudCount})</Text>
           </TouchableOpacity>
         </View>
 
         {isLoading ? (
           <View style={styles.center}>
-            <ActivityIndicator color="#8B5CF6" size="large" />
+            <ActivityIndicator color="#E54B2A" size="large" />
             <Text style={styles.loadingText}>Loading recordings...</Text>
           </View>
         ) : filteredRecordings.length === 0 ? (
@@ -586,7 +586,7 @@ export default function GalleryScreen() {
               <RefreshControl
                 refreshing={refreshing}
                 onRefresh={() => { setRefreshing(true); fetchRecordings(); }}
-                tintColor="#8B5CF6"
+                tintColor="#E54B2A"
               />
             }
             showsVerticalScrollIndicator={false}
@@ -635,9 +635,9 @@ const styles = StyleSheet.create({
   backBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: '#111', justifyContent: 'center', alignItems: 'center' },
   sideStats: { alignItems: 'center', gap: 14 },
   sideStat: { alignItems: 'center' },
-  sideStatNum: { color: '#8B5CF6', fontSize: 18, fontWeight: '800' },
+  sideStatNum: { color: '#E54B2A', fontSize: 18, fontWeight: '800' },
   sideStatLabel: { color: '#555', fontSize: 8, marginTop: 2 },
-  refreshBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(139,92,246,0.15)', justifyContent: 'center', alignItems: 'center' },
+  refreshBtn: { width: 36, height: 36, borderRadius: 8, backgroundColor: 'rgba(229,75,42,0.15)', justifyContent: 'center', alignItems: 'center' },
 
   // Content
   content: { flex: 1 },
@@ -648,9 +648,9 @@ const styles = StyleSheet.create({
   // Filter Tabs
   filterTabs: { flexDirection: 'row', padding: 8, gap: 8, borderBottomWidth: 1, borderBottomColor: '#1a1a1a' },
   filterTab: { flexDirection: 'row', alignItems: 'center', gap: 4, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 6, backgroundColor: '#111' },
-  filterTabActive: { backgroundColor: 'rgba(139,92,246,0.2)', borderWidth: 1, borderColor: '#8B5CF6' },
+  filterTabActive: { backgroundColor: 'rgba(229,75,42,0.2)', borderWidth: 1, borderColor: '#E54B2A' },
   filterTabText: { color: '#666', fontSize: 11, fontWeight: '500' },
-  filterTabTextActive: { color: '#8B5CF6' },
+  filterTabTextActive: { color: '#E54B2A' },
 
   center: { flex: 1, justifyContent: 'center', alignItems: 'center', padding: 20 },
   loadingText: { color: '#555', fontSize: 12, marginTop: 12 },
@@ -659,7 +659,7 @@ const styles = StyleSheet.create({
   emptyIcon: { width: 80, height: 80, borderRadius: 40, backgroundColor: '#0a0a0a', justifyContent: 'center', alignItems: 'center', marginBottom: 16 },
   emptyTitle: { color: '#fff', fontSize: 16, fontWeight: '600' },
   emptyText: { color: '#555', fontSize: 12, marginTop: 4, textAlign: 'center', maxWidth: 250 },
-  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#8B5CF6', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, marginTop: 20 },
+  emptyBtn: { flexDirection: 'row', alignItems: 'center', gap: 8, backgroundColor: '#E54B2A', paddingHorizontal: 20, paddingVertical: 12, borderRadius: 8, marginTop: 20 },
   emptyBtnText: { color: '#fff', fontSize: 13, fontWeight: '600' },
 
   // List
@@ -672,8 +672,8 @@ const styles = StyleSheet.create({
   cardDate: { color: '#fff', fontSize: 12, fontWeight: '600' },
   cardDuration: { color: '#666', fontSize: 10, marginTop: 2 },
   cardActions: { flexDirection: 'row', alignItems: 'center', gap: 8 },
-  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: 'rgba(139,92,246,0.15)', borderRadius: 4 },
-  previewBtnText: { color: '#8B5CF6', fontSize: 10, fontWeight: '600' },
+  previewBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: 'rgba(229,75,42,0.15)', borderRadius: 4 },
+  previewBtnText: { color: '#E54B2A', fontSize: 10, fontWeight: '600' },
   reprocessBtn: { padding: 6, backgroundColor: 'rgba(245,158,11,0.15)', borderRadius: 4 },
   uploadBtn: { flexDirection: 'row', alignItems: 'center', gap: 4, padding: 6, backgroundColor: 'rgba(16,185,129,0.15)', borderRadius: 4 },
   uploadBtnText: { color: '#10B981', fontSize: 10, fontWeight: '600' },
