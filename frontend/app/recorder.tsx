@@ -612,8 +612,8 @@ export default function RecorderScreen() {
             <Text style={styles.actLabel}>Gallery</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actBtn} onPress={() => router.push('/settings')}>
-            <Ionicons name="settings" size={18} color="#8B5CF6" />
-            <Text style={[styles.actLabel, { color: '#8B5CF6' }]}>Settings</Text>
+            <Ionicons name="settings" size={18} color="#E54B2A" />
+            <Text style={[styles.actLabel, { color: '#E54B2A' }]}>Settings</Text>
           </TouchableOpacity>
           <TouchableOpacity style={styles.actBtn} onPress={handleLogout}>
             <Ionicons name="power" size={18} color="#EF4444" />
