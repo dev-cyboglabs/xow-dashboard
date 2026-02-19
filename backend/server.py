@@ -20,6 +20,7 @@ import tempfile
 from openai import OpenAI
 
 ROOT_DIR = Path(__file__).parent
+FRONTEND_DIR = ROOT_DIR.parent / "frontend"
 load_dotenv(ROOT_DIR / '.env')
 
 # MongoDB connection
@@ -1650,9 +1651,9 @@ app.include_router(api_router)
 # Serve home page
 @app.get("/api/home")
 async def serve_home():
-    return FileResponse(ROOT_DIR / "static" / "index.html")
+    return FileResponse(FRONTEND_DIR / "index.html")
 
 # Serve dashboard
 @app.get("/api/dashboard")
 async def serve_dashboard():
-    return FileResponse(ROOT_DIR / "static" / "dashboard.html")
+    return FileResponse(FRONTEND_DIR / "dashboard.html")
