@@ -54,6 +54,7 @@ export default function RecorderScreen() {
   const [currentRecording, setCurrentRecording] = useState<any>(null);
   const [recordingTime, setRecordingTime] = useState(0);
   const [frameCount, setFrameCount] = useState(0);
+  const [fps, setFps] = useState(0);
   const [barcodeInput, setBarcodeInput] = useState('');
   const [barcodeCount, setBarcodeCount] = useState(0);
   const [barcodeScans, setBarcodeScans] = useState<BarcodeData[]>([]);
@@ -70,6 +71,9 @@ export default function RecorderScreen() {
   const cameraRef = useRef<CameraView>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const frameTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const fpsTimerRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  const frameCountRef = useRef(0);
+  const lastFpsFrameRef = useRef(0);
   const clockRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingStartTime = useRef<number>(0);
   const barcodeInputRef = useRef<TextInput>(null);
@@ -88,6 +92,7 @@ export default function RecorderScreen() {
       clearInterval(connInterval);
       if (timerRef.current) clearInterval(timerRef.current);
       if (frameTimerRef.current) clearInterval(frameTimerRef.current);
+      if (fpsTimerRef.current) clearInterval(fpsTimerRef.current);
       if (clockRef.current) clearInterval(clockRef.current);
     };
   }, []);
@@ -163,8 +168,19 @@ export default function RecorderScreen() {
       const localId = `rec_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
       setCurrentRecording({ localId });
       
+      frameCountRef.current = 0;
+      lastFpsFrameRef.current = 0;
+      setFps(0);
       timerRef.current = setInterval(() => setRecordingTime(p => p + 1), 1000);
-      frameTimerRef.current = setInterval(() => setFrameCount(p => p + 1), 33.33);
+      frameTimerRef.current = setInterval(() => {
+        frameCountRef.current += 1;
+        setFrameCount(frameCountRef.current);
+      }, 33.33);
+      fpsTimerRef.current = setInterval(() => {
+        const current = frameCountRef.current;
+        setFps(current - lastFpsFrameRef.current);
+        lastFpsFrameRef.current = current;
+      }, 1000);
 
       // Show Android Expo Go limitation notice
       if (Platform.OS === 'android' && __DEV__) {
@@ -227,6 +243,7 @@ export default function RecorderScreen() {
       setIsRecording(false);
       if (timerRef.current) clearInterval(timerRef.current);
       if (frameTimerRef.current) clearInterval(frameTimerRef.current);
+      if (fpsTimerRef.current) clearInterval(fpsTimerRef.current);
 
       let audioUri: string | null = null;
       let videoUri: string | null = null;
@@ -494,8 +511,8 @@ export default function RecorderScreen() {
               <View style={styles.tcDiv} />
               <Text style={styles.tcLabel}>TIMECODE</Text>
               <Text style={[styles.tcVal, { color: '#EF4444' }]}>{formatTC(recordingTime)}</Text>
-              <Text style={styles.tcLabel}>FRAME</Text>
-              <Text style={[styles.tcVal, { color: '#E54B2A', fontSize: 9 }]}>{frameCount.toString().padStart(6, '0')}</Text>
+              <Text style={styles.tcLabel}>FPS</Text>
+              <Text style={[styles.tcVal, { color: '#E54B2A', fontSize: 9 }]}>{fps} fps</Text>
             </>
           )}
         </View>
