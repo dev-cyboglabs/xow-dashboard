@@ -473,6 +473,32 @@ export default function RecorderScreen() {
   return (
     <View style={[styles.container, { width, height }]}>
       <View style={[styles.cameraArea, { width: width - panelWidth }]}>
+
+        {/* Preview Header — shown above the video when recording */}
+        {isRecording && (
+          <View style={styles.previewHeader}>
+            <View style={styles.previewHeaderLeft}>
+              <View style={styles.previewLogo}>
+                <Ionicons name="videocam" size={14} color="#fff" />
+                <Text style={styles.previewLogoText}>XoW</Text>
+                <View style={styles.previewLiveDot} />
+              </View>
+              <View style={styles.previewDivider} />
+              <View style={styles.previewTCBlock}>
+                <Text style={styles.previewMetaLabel}>TIMECODE</Text>
+                <Text style={styles.previewTCVal}>{formatTC(recordingTime)}</Text>
+              </View>
+              <View style={styles.previewDivider} />
+              <View style={styles.previewTCBlock}>
+                <Text style={styles.previewMetaLabel}>FPS</Text>
+                <Text style={styles.previewFPSVal}>{fps}</Text>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* Camera feed */}
+        <View style={styles.cameraViewWrapper}>
         <CameraView ref={cameraRef} style={StyleSheet.absoluteFill} facing="back" mode="video" />
 
         {/* Top Bar */}
@@ -500,21 +526,12 @@ export default function RecorderScreen() {
           </View>
         </View>
 
-        {/* Timecode Box */}
+        {/* Timecode Box — date/time only */}
         <View style={styles.tcBox}>
           <Text style={styles.tcLabel}>DATE</Text>
           <Text style={styles.tcVal}>{formatDate(currentTime)}</Text>
           <Text style={styles.tcLabel}>TIME</Text>
           <Text style={styles.tcVal}>{formatTime(currentTime)}</Text>
-          {isRecording && (
-            <>
-              <View style={styles.tcDiv} />
-              <Text style={styles.tcLabel}>TIMECODE</Text>
-              <Text style={[styles.tcVal, { color: '#EF4444' }]}>{formatTC(recordingTime)}</Text>
-              <Text style={styles.tcLabel}>FPS</Text>
-              <Text style={[styles.tcVal, { color: '#E54B2A', fontSize: 9 }]}>{fps} fps</Text>
-            </>
-          )}
         </View>
 
         {/* Watermark */}
@@ -563,6 +580,7 @@ export default function RecorderScreen() {
             <Text style={styles.toastText}>{toastMessage}</Text>
           </Animated.View>
         )}
+        </View>{/* end cameraViewWrapper */}
       </View>
 
       {/* Control Panel */}
@@ -647,7 +665,20 @@ export default function RecorderScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, flexDirection: 'row', backgroundColor: '#000' },
-  cameraArea: { flex: 1, position: 'relative' },
+  cameraArea: { flex: 1, flexDirection: 'column' },
+  cameraViewWrapper: { flex: 1, position: 'relative' },
+
+  // Preview header — above the video when recording
+  previewHeader: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#0d0d0d', borderBottomWidth: 1, borderBottomColor: '#1a1a1a', paddingHorizontal: 12, paddingVertical: 6 },
+  previewHeaderLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  previewLogo: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+  previewLogoText: { color: '#fff', fontSize: 14, fontWeight: '800', letterSpacing: 1 },
+  previewLiveDot: { width: 7, height: 7, borderRadius: 4, backgroundColor: '#EF4444' },
+  previewDivider: { width: 1, height: 20, backgroundColor: '#2a2a2a' },
+  previewTCBlock: { alignItems: 'flex-start', gap: 1 },
+  previewMetaLabel: { color: '#555', fontSize: 7, fontWeight: '700', letterSpacing: 0.5 },
+  previewTCVal: { color: '#EF4444', fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
+  previewFPSVal: { color: '#E54B2A', fontSize: 13, fontWeight: '700', fontFamily: Platform.OS === 'ios' ? 'Menlo' : 'monospace' },
   
   topBar: { position: 'absolute', top: 10, left: 10, right: 10, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start' },
   deviceSection: { gap: 4 },
